@@ -30,6 +30,12 @@ function safeNum(x: unknown, fallback = 0): number {
   return isFiniteNumber(x) ? x : fallback;
 }
 
+function safeStr(x: unknown, fallback = ""): string {
+  if (x === null || x === undefined) return fallback;
+  return String(x);
+}
+
+
 function extractTypeCodeFromLabel(label: unknown): string {
   const s = safeStr(label);
   // Expected label formats: "Ax-4. Reasoning Simulator", "T2. Reflective Thinker", etc.
