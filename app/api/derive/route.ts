@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { deriveAll } from '@/lib/derive';
+// IMPORTANT: use a relative import so this project builds even if path aliases
+// are not picked up by the bundler in some Vercel configurations.
+import { deriveAll } from '../../../lib/derive';
 
 // Ensure this route runs in the Node.js runtime on Vercel (fs/path are Node-only).
 export const runtime = 'nodejs';
