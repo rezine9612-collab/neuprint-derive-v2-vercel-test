@@ -4354,6 +4354,22 @@ function numOr0(x: any): number {
   const v = Number(x);
   return Number.isFinite(v) ? v : 0;
 }
+function boolOrU(x: any): boolean | undefined {
+  if (x == null) return undefined;
+  if (typeof x === 'boolean') return x;
+  if (typeof x === 'number') return Number.isFinite(x) ? x > 0 : undefined;
+  if (typeof x === 'string') {
+    const s = x.trim().toLowerCase();
+    if (!s) return undefined;
+    if (['true', 't', 'yes', 'y', '1'].includes(s)) return true;
+    if (['false', 'f', 'no', 'n', '0'].includes(s)) return false;
+    // fallback: non-empty string is treated as true
+    return true;
+  }
+  // fallback: truthiness
+  return !!x;
+}
+
 
 function pickRawFeaturesV1(input: any): RawFeaturesV1 {
   const rf = input?.raw_features ?? input ?? {};
@@ -4369,7 +4385,7 @@ function pickRawFeaturesV1(input: any): RawFeaturesV1 {
 
     transitions: numOr0(rf?.layer_2?.transitions),
     transition_ok: numOr0(rf?.layer_2?.transition_ok),
-    belief_change: numOr0(rf?.layer_2?.belief_change),
+    belief_change: boolOrU(rf?.layer_2?.belief_change),
     evidence_types: rf?.layer_2?.evidence_types == null ? undefined : numOr0(rf?.layer_2?.evidence_types),
     adjacency_links: rf?.layer_2?.adjacency_links == null ? undefined : numOr0(rf?.layer_2?.adjacency_links),
 
