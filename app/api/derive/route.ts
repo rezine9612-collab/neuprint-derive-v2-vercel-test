@@ -9,7 +9,7 @@ import { deriveAll } from '../../../lib/derive';
 // Ensure this route runs in the Node.js runtime on Vercel (fs/path are Node-only).
 export const runtime = 'nodejs';
 
-const BUILD_TAG = 'NP-DERIVE-V2-FIXED8';
+const BUILD_TAG = 'NP-DERIVE-V2-FIXED9';
 
 function readFixture(): any {
   const p = path.join(process.cwd(), 'fixtures', 'raw_feature.json');

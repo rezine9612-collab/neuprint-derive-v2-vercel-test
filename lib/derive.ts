@@ -4442,7 +4442,7 @@ export type OutputJSON2 = {
   };
   cff: {
     pattern: { primary_label: string; secondary_label: string; definition: string };
-    final_type: { label: string; confidence_0to1: number; definition: string };
+    final_type: { type_code: string; label: string; confidence_0to1: number; definition: string };
     labels: string[];
     values_0to1: number[];
   };
@@ -4464,6 +4464,17 @@ export type OutputJSON2 = {
     pattern_interpretation: string;
   };
 };
+
+function extractTypeCodeFromLabel(label: string): string {
+  // Expected formats:
+  // - "T2"
+  // - "T2. Reflective Thinker"
+  // - "T2 Reflective Thinker"
+  // If unknown, return "T0".
+  const s = String(label ?? "").trim();
+  const m = /^T\d+/.exec(s);
+  return m?.[0] ?? "T0";
+}
 
 type AssembleArgs = {
   rslLevelObj: any;
@@ -4520,6 +4531,11 @@ function assembleOutputJSON2(a: AssembleArgs): OutputJSON2 {
         })(),
       },
       final_type: {
+        type_code: (() => {
+          const explicit = a?.cffFinalObj?.cff?.final_type?.type_code;
+          if (typeof explicit === "string" && explicit.trim()) return explicit.trim();
+          return extractTypeCodeFromLabel(String(a?.cffFinalObj?.cff?.final_type?.label ?? ""));
+        })(),
         label: String(a?.cffFinalObj?.cff?.final_type?.label ?? ""),
         confidence_0to1: clamp01_out(numOr0(a?.cffFinalObj?.cff?.final_type?.confidence_0to1)),
         definition: String(a?.cffFinalObj?.cff?.final_type?.definition ?? ""),
