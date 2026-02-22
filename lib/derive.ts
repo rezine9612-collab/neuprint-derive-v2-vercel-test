@@ -29,6 +29,17 @@ function round2(x: number): number {
 function safeNum(x: unknown, fallback = 0): number {
   return isFiniteNumber(x) ? x : fallback;
 }
+
+function extractTypeCodeFromLabel(label: unknown): string {
+  const s = safeStr(label);
+  // Expected label formats: "Ax-4. Reasoning Simulator", "T2. Reflective Thinker", etc.
+  const m = s.match(/^([A-Za-z]{1,3}\d*(?:-[0-9]+)?)\./);
+  if (m && m[1]) return m[1];
+  // Fallback: first token up to space
+  const t = s.split(/\s+/).filter(Boolean)[0] ?? "";
+  return t.replace(/[^A-Za-z0-9\-]/g, "");
+}
+
 function safeDiv(num: number, den: number, fallback = 0): number {
   if (!Number.isFinite(num) || !Number.isFinite(den) || den === 0) return fallback;
   return num / den;
@@ -1853,6 +1864,7 @@ export type CffInput = { indicators: Record<IndicatorCode, IndicatorValue | unde
 
 export type CffFinalTypePublic = {
   label: string;
+  type_code: string;
   chip_label: string;
   confidence: number; // 0..1
   interpretation: string;
@@ -3127,14 +3139,6 @@ export interface LogisticModel {
   z_clip?: number;
 }
 
-export const DEFAULT_RC_LOGISTIC_MODEL: LogisticModel = {
-  // Chosen to match the reference fixture distribution (Human 82%, Hybrid 9%, AI 9%)
-  // when no explicit model is supplied via deriveAll(opts).
-  beta0: 1.5163474893680884,
-  betas: {},
-  z_clip: 8,
-};
-
 
 /* ---------- Inputs / Outputs ---------- */
 
@@ -3934,65 +3938,6 @@ export type RfsGroupTop3Json = {
   };
 };
 
-export const DEFAULT_RFS_JOB_GROUP_TOP3: RfsGroupTop3Json = {
-  rfs: {
-    summary_lines: [
-      "Strategy·Analysis·Policy: 78%",
-      "Data·AI·Intelligence: 74%",
-      "Engineering·Technology·Architecture: 68%",
-    ],
-    top_groups: [
-      {
-        group_name: "Strategy·Analysis·Policy",
-        percent: 78,
-        roles: [
-          "Strategy Analyst",
-          "Management Analyst",
-          "Policy Analyst",
-          "Economic Researcher",
-          "Financial Analyst",
-          "Risk Analyst",
-          "Compliance Officer",
-          "Internal Auditor",
-        ],
-        recommended_role: "Strategy Analyst",
-      },
-      {
-        group_name: "Data·AI·Intelligence",
-        percent: 74,
-        roles: [
-          "Data Analyst",
-          "Data Scientist",
-          "Business Intelligence Analyst",
-          "Machine Learning Analyst",
-          "Statistician",
-          "Operations Research Analyst",
-          "Information Security Analyst",
-        ],
-        recommended_role: "Data Scientist",
-      },
-      {
-        group_name: "Engineering·Technology·Architecture",
-        percent: 68,
-        roles: [
-          "Software Engineer",
-          "Systems Architect",
-          "Cloud Engineer",
-          "DevOps Engineer",
-          "Network Architect",
-          "QA Engineer",
-          "Safety Systems Engineer",
-        ],
-        recommended_role: "Systems Architect",
-      },
-    ],
-    recommended_roles_top3: ["Strategy Analyst", "Data Scientist", "Systems Architect"],
-    recommended_roles_line: "Recommended roles include: Strategy Analyst, Data Scientist, Systems Architect.",
-    pattern_interpretation:
-      "Strong in conceptual structuring and strategic direction setting, this profile is well suited for designing large-scale frameworks and guiding decision alignment across complex constraints.",
-  },
-};
-
 function isFinite01(x: number): boolean {
   return isFiniteNumber(x) && x >= 0 && x <= 1;
 }
@@ -4515,6 +4460,7 @@ export type OutputJSON2 = {
     };
     final_type: {
       label: string;
+      type_code: string;
       chip_label: string;
       confidence: number; // 0..1
       interpretation: string;
@@ -4555,14 +4501,29 @@ export type OutputJSON2 = {
 };
 
 function extractTypeCodeFromLabel(label: string): string {
-  // Expected formats:
+  // Handles common formats:
   // - "T2"
   // - "T2. Reflective Thinker"
-  // - "T2 Reflective Thinker"
-  // If unknown, return "T0".
+  // - "Ax-4. Reasoning Simulator"
+  // - "Ax-4 Reasoning Simulator"
+  // - "L3" (rare in CFF; included for safety)
+  // Returns "UNK" if not detectable.
   const s = String(label ?? "").trim();
-  const m = /^T\d+/.exec(s);
-  return m?.[0] ?? "T0";
+  if (!s) return "UNK";
+
+  // 1) Ax-4 / Hx-1 / etc (two-letter code ending with 'x' + dash + digits)
+  const mAx = /^([A-Za-z]{1,3}x-\d+)/.exec(s);
+  if (mAx?.[1]) return mAx[1];
+
+  // 2) Generic code-with-dash digits (e.g., "A-7")
+  const mDash = /^([A-Za-z]{1,4}-\d+)/.exec(s);
+  if (mDash?.[1]) return mDash[1];
+
+  // 3) T2 / R3 style (letter(s) + digits)
+  const mTD = /^([A-Za-z]{1,3}\d+)/.exec(s);
+  if (mTD?.[1]) return mTD[1];
+
+  return "UNK";
 }
 
 type AssembleArgs = {
@@ -4655,6 +4616,7 @@ function assembleOutputJSON2(a: AssembleArgs): OutputJSON2 {
       },
       final_type: {
         label: safeStr(a?.cffFinalObj?.cff?.final_type?.label),
+        type_code: extractTypeCodeFromLabel(a?.cffFinalObj?.cff?.final_type?.label),
         chip_label: safeStr(a?.cffFinalObj?.cff?.final_type?.chip_label),
         confidence: clamp01_out(safeNum(a?.cffFinalObj?.cff?.final_type?.confidence)),
         interpretation: safeStr(a?.cffFinalObj?.cff?.final_type?.interpretation),
@@ -4787,180 +4749,8 @@ function clamp0to100_out(x: number): number {
 }
 
 
-
-const REFERENCE_FIXTURE_OUTPUT_JSON: any = {
-  rsl: {
-    level: {
-      short_name: "L3 Structured",
-      full_name: "L3 Structured Reasoning",
-      definition: "Organized reasoning components with partial coordination across dimensions.",
-    },
-    fri: {
-      score: 3.72,
-      interpretation:
-        "Your reasoning structure is stable in most situations. Connections and evaluations usually remain consistent.",
-    },
-    cohort: {
-      percentile_0to1: 0.62,
-      top_percent_label: "Top 38%",
-      interpretation:
-        "Developing structure, with several reasoning patterns beginning to align relative to comparable peers.",
-    },
-    sri: {
-      score: 0.92,
-      interpretation:
-        "Strong internal coherence is observed. Structural interpretation can be stated with higher confidence.",
-    },
-  },
-  cff: {
-    pattern: {
-      primary_label: "Reflective Explorer",
-      secondary_label: "Evidence Weaver",
-      definition: {
-        primary:
-          "Reflective Explorer shows active self-revision and exploratory restructuring during reasoning. Thought progresses through reflection, reassessment, and adaptive refinement.",
-        secondary:
-          "Evidence Weaver emphasizes linking claims with supporting material. Reasoning strength lies in evidence connectivity rather than abstract inference.",
-      },
-    },
-    final_type: {
-      label: "Ax-4. Reasoning Simulator",
-      chip_label: "Reasoning Simulator",
-      confidence: 0.81,
-      interpretation:
-        "Ax-4. Reasoning Simulator reflects a reasoning structure that appears coherent and well-formed, while transitions and revisions are driven by simulated control patterns rather than direct intent formation.",
-    },
-    labels: ["AAS", "CTF", "RMD", "RDX", "EDS", "IFD", "KPF-Sim", "TPS-H"],
-    values_0to1: [0.71, 0.64, 0.58, 0.73, 0.66, 0.79, "N/A", "N/A"],
-  },
-  rc: {
-    summary:
-      "Human-led reasoning with sustained reflective control and stable structural revision. The current position is centered within the human reasoning cluster.",
-    control_pattern: "Deep Reflective Human",
-    reliability_band: "HIGH",
-    band_rationale:
-      "Reasoning decisions originate from explicit human-driven revision and counter-evaluative judgment rather than automated continuation flow.",
-    pattern_interpretation:
-      "A high human proportion indicates stable human-led control at structural decision boundaries across the task.",
-    observed_structural_signals: {
-      "1": "Revision activity occurs at semantic decision boundaries.",
-      "2": "Argument order adjustments correspond to logical correction.",
-      "3": "Consistency checks appear across structural transitions.",
-      "4": "No sustained repetitive propagation is observed across reasoning segments.",
-    },
-    reasoning_control_distribution: {
-      Human: "82%",
-      Hybrid: "9%",
-      AI: "9%",
-      final_determination: "Human",
-      determination_sentence:
-        "The combined signal profile supports classification as human-controlled reasoning.",
-    },
-    structural_control_signals: {
-      structural_variance: 0.42,
-      human_rhythm_index: 0.67,
-      transition_flow: 0.58,
-      revision_depth: 0.31,
-    },
-  },
-  rfs: {
-    primary_pattern: "Reflective Explorer",
-    representative_phrase: "structured but exploratory",
-    summary_lines: [
-      "Strategy·Analysis·Policy: 78%",
-      "Data·AI·Intelligence: 74%",
-      "Engineering·Technology·Architecture: 68%",
-    ],
-    top_groups: [
-      {
-        group_name: "Strategy·Analysis·Policy",
-        percent: 78,
-        roles: [
-          "Strategy Analyst",
-          "Management Analyst",
-          "Policy Analyst",
-          "Economic Researcher",
-          "Financial Analyst",
-          "Risk Analyst",
-          "Compliance Officer",
-          "Internal Auditor",
-        ],
-        recommended_role: "Strategy Analyst",
-      },
-      {
-        group_name: "Data·AI·Intelligence",
-        percent: 74,
-        roles: [
-          "Data Analyst",
-          "Data Scientist",
-          "Business Intelligence Analyst",
-          "Machine Learning Analyst",
-          "Statistician",
-          "Operations Research Analyst",
-          "Information Security Analyst",
-        ],
-        recommended_role: "Data Scientist",
-      },
-      {
-        group_name: "Engineering·Technology·Architecture",
-        percent: 68,
-        roles: [
-          "Software Engineer",
-          "Systems Architect",
-          "Cloud Engineer",
-          "DevOps Engineer",
-          "Network Architect",
-          "QA Engineer",
-          "Safety Systems Engineer",
-        ],
-        recommended_role: "Systems Architect",
-      },
-    ],
-    recommended_roles_top3: ["Strategy Analyst", "Data Scientist", "Systems Architect"],
-    recommended_roles_line:
-      "Recommended roles include: Strategy Analyst, Data Scientist, Systems Architect.",
-    pattern_interpretation:
-      "Strong in conceptual structuring and strategic direction setting, this profile is well suited for designing large-scale frameworks and guiding decision alignment across complex constraints.",
-  },
-};
-
-function isReferenceFixtureInput(g: any): boolean {
-  try {
-    const rf = g?.raw_features;
-    const rub = g?.rsl_rubric;
-    if (!rf || !rub) return false;
-
-    const l0 = rf.layer_0;
-    const l2 = rf.layer_2;
-    const l3 = rf.layer_3;
-
-    const ok =
-      l0?.units === 6 &&
-      Array.isArray(l0?.unit_lengths) &&
-      String(l0.unit_lengths) === String([119, 67, 355, 73, 262, 508]) &&
-      l2?.transitions === 5 &&
-      l2?.revisions === 0 &&
-      l3?.intent_markers === 0 &&
-      l3?.hedges === 12 &&
-      rub?.coherence === 5 &&
-      rub?.structure === 3 &&
-      rub?.evaluation === 2 &&
-      rub?.integration === 3;
-
-    return !!ok;
-  } catch {
-    return false;
-  }
-}
-
 export function deriveAll(input: GptBackendInput, opts: DeriveAllOptions = {}): any {
   const g = input ?? ({} as any);
-
-  // Fast-path: exact fixture matching (gpt raw feature.txt -> 백엔드 출력 json.txt)
-  if (isReferenceFixtureInput(g)) {
-    return REFERENCE_FIXTURE_OUTPUT_JSON;
-  }
-
 
   // ---------------------------------------------------------
   // 0) Read GPT-provided RSL dimensions and quote candidates
@@ -5039,7 +4829,7 @@ export function deriveAll(input: GptBackendInput, opts: DeriveAllOptions = {}): 
   });
 
   // Distribution requires a logistic model for exact matching.
-  const rcModel = opts?.rcLogisticModel ?? DEFAULT_RC_LOGISTIC_MODEL;
+  const rcModel = requireOrThrow(opts?.rcLogisticModel, "deriveAll: rcLogisticModel is required for exact distribution matching.");
 
   // Build CFV vector (0..1). We use CFF6 axes + HI + TPS_H.
   const cfv: CFV = {
@@ -5090,7 +4880,7 @@ export function deriveAll(input: GptBackendInput, opts: DeriveAllOptions = {}): 
     },
   });
 
-  const roleConfigs = opts?.roleConfigs;
+  const roleConfigs = requireOrThrow(opts?.roleConfigs, "deriveAll: roleConfigs is required for exact job role fit matching.");
   const arcLevelNum = (() => {
     const code = String(rslLevelObj?.rsl?.level?.short_name ?? "");
     const m = code.match(/\bL([1-6])\b/);
@@ -5105,9 +4895,10 @@ export function deriveAll(input: GptBackendInput, opts: DeriveAllOptions = {}): 
     authenticity: numOr0(coreAxes?.IFD),
   };
 
-  const rfsJob = roleConfigs
-    ? computeRfsJobGroupTop3({ axes, arc_level: arcLevelNum }, roleConfigs)
-    : DEFAULT_RFS_JOB_GROUP_TOP3;
+  const rfsJob = computeRfsJobGroupTop3(
+    { axes, arc_level: arcLevelNum },
+    roleConfigs
+  );
 
   // ---------------------------------------------------------
   // 5) Final Assembly (JSON2 contract)
