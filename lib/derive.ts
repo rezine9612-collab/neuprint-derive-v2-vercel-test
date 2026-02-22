@@ -4487,8 +4487,6 @@ export type OutputJSON2 = {
   };
 };
 
-function extractTypeCodeFromLabel
-
 function extractTypeCodeFromLabel(label: string): string {
   // Expected formats:
   // - "T2"
