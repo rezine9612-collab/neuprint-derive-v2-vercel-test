@@ -10,45 +10,6 @@ RULES (user-locked)
 3) Keep existing SRI computation as-is.
 */
 
-/* ===== Global helpers (deduped for single-file build) ===== */
-function isFiniteNumber(x: unknown): x is number {
-  return typeof x === "number" && Number.isFinite(x);
-}
-function clamp01(x: number): number {
-  if (!Number.isFinite(x)) return 0;
-  return Math.max(0, Math.min(1, x));
-}
-function clamp0to5(x: number): number {
-  if (!Number.isFinite(x)) return 0;
-  return Math.max(0, Math.min(5, x));
-}
-function round2(x: number): number {
-  if (!Number.isFinite(x)) return 0;
-  return Math.round((x + Number.EPSILON) * 100) / 100;
-}
-function safeNum(x: unknown, fallback = 0): number {
-  return isFiniteNumber(x) ? x : fallback;
-}
-function safeDiv(num: number, den: number, fallback = 0): number {
-  if (!Number.isFinite(num) || !Number.isFinite(den) || den === 0) return fallback;
-  return num / den;
-}
-function mean(xs: number[]): number {
-  if (!xs?.length) return 0;
-  const s = xs.reduce((a, b) => a + (Number.isFinite(b) ? b : 0), 0);
-  return s / xs.length;
-}
-function std(xs: number[]): number {
-  if (!xs?.length) return 0;
-  const m = mean(xs);
-  const v = mean(xs.map((x) => {
-    const d = (Number.isFinite(x) ? x : 0) - m;
-    return d * d;
-  }));
-  return Math.sqrt(v);
-}
-
-
 
 
 
@@ -93,6 +54,15 @@ export type FRIResult = {
     };
   };
 };
+
+function clamp0to5(x: number): number {
+  const v = Number.isFinite(x) ? x : 0;
+  return Math.max(0, Math.min(5, v));
+}
+
+function round2(x: number): number {
+  return Math.round(x * 100) / 100;
+}
 
 /**
  * Safe lookup by code so it does not depend on array order.
@@ -308,6 +278,11 @@ const CUT_L5 = 4.8 * (5 / 6); // 4.0
 const CUT_L6 = 5.4 * (5 / 6); // 4.5
 
 const MAX_EVIDENCE_QUOTES = 2; // Recommendation #3
+
+function clamp0to5(x: number): number {
+  if (!Number.isFinite(x)) return 0;
+  return Math.max(0, Math.min(5, x));
+}
 
 function asLevelMeta(level: RSLLevelCode): RSLLevelMeta {
   return LEVEL_METADATA[level];
@@ -771,13 +746,42 @@ export type RslRubric4 = {
    Basic helpers
    ====================== */
 
+function isFiniteNumber(x: unknown): x is number {
+  return typeof x === "number" && Number.isFinite(x);
+}
+
+function clamp01(x: number): number {
+  if (!Number.isFinite(x)) return 0;
+  return x < 0 ? 0 : x > 1 ? 1 : x;
+}
+
 function clamp(x: number, lo: number, hi: number): number {
   if (!Number.isFinite(x)) return lo;
   return x < lo ? lo : x > hi ? hi : x;
 }
 
+function round2(x: number): number {
+  return Math.round(x * 100) / 100;
+}
+
+function mean(xs: number[]): number {
+  if (!xs.length) return 0;
+  return xs.reduce((a, b) => a + b, 0) / xs.length;
+}
+
+function std(xs: number[]): number {
+  if (!xs.length) return 0;
+  const m = mean(xs);
+  const v = mean(xs.map((x) => (x - m) ** 2));
+  return Math.sqrt(v);
+}
+
 function safeInt(x: unknown, fallback = 0): number {
   return isFiniteNumber(x) ? Math.max(0, Math.floor(x)) : fallback;
+}
+
+function safeNum(x: unknown, fallback = 0): number {
+  return isFiniteNumber(x) ? x : fallback;
 }
 
 function safeArray(x: unknown): number[] {
@@ -1201,10 +1205,6 @@ export type RawFeaturesV1 = {
   // 5) EDS
   evidence_types?: string[]; // set 취급
 
-  // (optional) structural adjacency density / link count
-  // NOTE: 일부 raw_features 생성기에서 layer_2.adjacency_links(숫자)로 제공될 수 있음.
-  adjacency_links?: number;
-
   // 6) IFD
   intent_markers: number;
   drift_segments?: number;
@@ -1229,6 +1229,14 @@ export type CFF8 = CFF6 & {
   KPF_SIM: number;
   TPS_H: number;
 };
+
+function safeDiv(a: number, b: number): number {
+  return a / Math.max(1, b);
+}
+
+function clamp01(x: number): number {
+  return Math.min(1, Math.max(0, x));
+}
 
 function structureWeight(st?: StructureType): number {
   // v1.0 문서 고정값
@@ -1360,6 +1368,10 @@ export type CffUiOut = {
     values_0to1: ScoreOrNA[];
   };
 };
+
+function round2(x: number): number {
+  return Math.round(x * 100) / 100;
+}
 
 function hasFinite(x: unknown): x is number {
   return typeof x === "number" && Number.isFinite(x);
@@ -1508,6 +1520,11 @@ export interface ObservedOptions {
 }
 
 /* ---------- helpers you already have ---------- */
+function clamp01(x: number): number {
+  if (!Number.isFinite(x)) return 0;
+  return Math.min(1, Math.max(0, x));
+}
+
 function weightedAvg(terms: Array<{ v: number | null; w: number }>): number | null {
   let W = 0;
   let S = 0;
@@ -1943,6 +1960,11 @@ export const INTERPRETATION_REGISTRY: Partial<Record<DetCode, string>> = {
     "Reasoning Simulator reflects a reasoning structure that appears coherent and well-formed, while transitions and revisions are driven by simulated control patterns rather than direct intent formation.",
 };
 
+function isFiniteNumber(x: unknown): x is number {
+  // Avoid Number.isFinite for older TS lib targets.
+  return typeof x === "number" && isFinite(x);
+}
+
 
 function ensureTypeCodePrefix(code: DetCode, typeName: string): string {
   const trimmed = String(typeName ?? "").trim();
@@ -1951,6 +1973,11 @@ function ensureTypeCodePrefix(code: DetCode, typeName: string): string {
   const normalized = trimmed.replace(/\s+/g, " ");
   if (normalized.startsWith(code + ".") || normalized.startsWith(code + " ")) return normalized;
   return code + ". " + normalized;
+}
+
+function clamp01(x: number): number {
+  if (!isFinite(x)) return 0;
+  return x < 0 ? 0 : x > 1 ? 1 : x;
 }
 
 function avg(a: number | null, b: number | null): number | null {
@@ -1982,6 +2009,11 @@ function confFromMargin(margin: number): number {
   if (v < capLow) v = capLow;
   if (v > capHigh) v = capHigh;
   return clamp01(v);
+}
+
+function round2(x: number): number {
+  // UI contract prefers a stable human-readable confidence like 0.81
+  return Math.round(x * 100) / 100;
 }
 
 export function computeFinalDeterminationCff(
@@ -2312,10 +2344,45 @@ export type AgencyIndicators = {
   revision_depth: number;        // 0..1
 };
 
+function clamp01(x: number): number {
+  if (!Number.isFinite(x)) return 0;
+  return x < 0 ? 0 : x > 1 ? 1 : x;
+}
+
+function round2(x: number): number {
+  if (!Number.isFinite(x)) return 0;
+  return Math.round((x + Number.EPSILON) * 100) / 100;
+}
+
+function safeNum(x: unknown, fallback = 0): number {
+  const n = typeof x === "number" ? x : Number(x);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function safeDiv(n: number, d: number): number {
+  return d > 0 ? n / d : 0;
+}
+
 function sum(arr: number[]): number {
   let s = 0;
   for (const v of arr) s += safeNum(v, 0);
   return s;
+}
+
+function mean(arr: number[]): number {
+  return arr.length ? sum(arr) / arr.length : 0;
+}
+
+function std(arr: number[]): number {
+  const n = arr.length;
+  if (n < 2) return 0;
+  const m = mean(arr);
+  let ss = 0;
+  for (const v of arr) {
+    const dv = safeNum(v, 0) - m;
+    ss += dv * dv;
+  }
+  return Math.sqrt(ss / (n - 1));
 }
 
 function cv(arr: number[]): number {
@@ -2844,8 +2911,18 @@ export type RCOut = {
   pattern_interpretation: string;
 };
 
+function isFiniteNumber(x: unknown): x is number {
+  return typeof x === "number" && isFinite(x);
+}
 function n0(x: unknown): number {
   return isFiniteNumber(x) ? x : 0;
+}
+function clamp01(x: number): number {
+  if (!isFinite(x)) return 0;
+  return x < 0 ? 0 : x > 1 ? 1 : x;
+}
+function safeDiv(a: number, b: number): number {
+  return a / Math.max(1, b);
 }
 // 0..inf -> 0..1, spike-safe
 function sat(x: number, k: number): number {
@@ -3149,6 +3226,13 @@ export interface RcDistributionOutput {
 
 
 /* ---------- helpers ---------- */
+
+function clamp01(x: number): number {
+  const v = Number.isFinite(x) ? x : 0;
+  if (v < 0) return 0;
+  if (v > 1) return 1;
+  return v;
+}
 
 function pct(x01: number): string {
   return `${Math.round(clamp01(x01) * 100)}%`;
@@ -3684,6 +3768,11 @@ export type RfsJson = {
   };
 };
 
+function clamp01(x: number): number {
+  if (!(typeof x === "number" && isFinite(x))) return 0;
+  return x < 0 ? 0 : x > 1 ? 1 : x;
+}
+
 function safe01(x: unknown): number {
   const n = typeof x === "number" ? x : Number(x);
   return clamp01(typeof n === "number" && isFinite(n) ? n : 0);
@@ -3925,6 +4014,17 @@ export type RfsGroupTop3Json = {
     pattern_interpretation: string; // role-aligned narrative (Top1 group anchored)
   };
 };
+
+function clamp01(x: number): number {
+  if (!isFiniteNumber(x)) return 0;
+  if (x < 0) return 0;
+  if (x > 1) return 1;
+  return x;
+}
+
+function isFiniteNumber(x: unknown): x is number {
+  return typeof x === "number" && isFinite(x);
+}
 
 function isFinite01(x: number): boolean {
   return isFiniteNumber(x) && x >= 0 && x <= 1;
@@ -4358,37 +4458,6 @@ function numOr0(x: any): number {
   const v = Number(x);
   return Number.isFinite(v) ? v : 0;
 }
-function boolOrU(x: any): boolean | undefined {
-  if (x == null) return undefined;
-  if (typeof x === 'boolean') return x;
-  if (typeof x === 'number') return Number.isFinite(x) ? x > 0 : undefined;
-  if (typeof x === 'string') {
-    const s = x.trim().toLowerCase();
-    if (!s) return undefined;
-    if (['true', 't', 'yes', 'y', '1'].includes(s)) return true;
-    if (['false', 'f', 'no', 'n', '0'].includes(s)) return false;
-    // fallback: non-empty string is treated as true
-    return true;
-  }
-  // fallback: truthiness
-  return !!x;
-}
-
-function strArrOrU(x: any): string[] | undefined {
-  if (x == null) return undefined;
-  if (Array.isArray(x)) {
-    const out = x.map((v) => (v == null ? '' : String(v))).filter((s) => s.trim().length > 0);
-    return out.length ? out : undefined;
-  }
-  // allow comma-separated strings
-  if (typeof x === 'string') {
-    const parts = x.split(',').map((s) => s.trim()).filter(Boolean);
-    return parts.length ? parts : undefined;
-  }
-  // numbers/objects are not representable as string[] in JSON2 contract
-  return undefined;
-}
-
 
 function pickRawFeaturesV1(input: any): RawFeaturesV1 {
   const rf = input?.raw_features ?? input ?? {};
@@ -4404,8 +4473,8 @@ function pickRawFeaturesV1(input: any): RawFeaturesV1 {
 
     transitions: numOr0(rf?.layer_2?.transitions),
     transition_ok: numOr0(rf?.layer_2?.transition_ok),
-    belief_change: boolOrU(rf?.layer_2?.belief_change),
-    evidence_types: strArrOrU(rf?.layer_2?.evidence_types),
+    belief_change: numOr0(rf?.layer_2?.belief_change),
+    evidence_types: rf?.layer_2?.evidence_types == null ? undefined : numOr0(rf?.layer_2?.evidence_types),
     adjacency_links: rf?.layer_2?.adjacency_links == null ? undefined : numOr0(rf?.layer_2?.adjacency_links),
 
     revisions: numOr0(rf?.layer_2?.revisions),
@@ -4442,7 +4511,7 @@ export type OutputJSON2 = {
   };
   cff: {
     pattern: { primary_label: string; secondary_label: string; definition: string };
-    final_type: { type_code: string; label: string; confidence_0to1: number; definition: string };
+    final_type: { label: string; confidence_0to1: number; definition: string };
     labels: string[];
     values_0to1: number[];
   };
@@ -4464,17 +4533,6 @@ export type OutputJSON2 = {
     pattern_interpretation: string;
   };
 };
-
-function extractTypeCodeFromLabel(label: string): string {
-  // Expected formats:
-  // - "T2"
-  // - "T2. Reflective Thinker"
-  // - "T2 Reflective Thinker"
-  // If unknown, return "T0".
-  const s = String(label ?? "").trim();
-  const m = /^T\d+/.exec(s);
-  return m?.[0] ?? "T0";
-}
 
 type AssembleArgs = {
   rslLevelObj: any;
@@ -4518,24 +4576,9 @@ function assembleOutputJSON2(a: AssembleArgs): OutputJSON2 {
       pattern: {
         primary_label: String(a?.cffPatternObj?.cff?.pattern?.primary_label ?? ""),
         secondary_label: String(a?.cffPatternObj?.cff?.pattern?.secondary_label ?? ""),
-        definition: (() => {
-          const d = a?.cffPatternObj?.cff?.pattern?.definition;
-          if (typeof d === "string") return d;
-          if (d && typeof d === "object") {
-            // Prefer common keys if present; otherwise stringify compactly.
-            const t = (d as any).text ?? (d as any).definition ?? (d as any).desc;
-            if (typeof t === "string") return t;
-            try { return JSON.stringify(d); } catch { return ""; }
-          }
-          return String(d ?? "");
-        })(),
+        definition: String(a?.cffPatternObj?.cff?.pattern?.definition ?? ""),
       },
       final_type: {
-        type_code: (() => {
-          const explicit = a?.cffFinalObj?.cff?.final_type?.type_code;
-          if (typeof explicit === "string" && explicit.trim()) return explicit.trim();
-          return extractTypeCodeFromLabel(String(a?.cffFinalObj?.cff?.final_type?.label ?? ""));
-        })(),
         label: String(a?.cffFinalObj?.cff?.final_type?.label ?? ""),
         confidence_0to1: clamp01_out(numOr0(a?.cffFinalObj?.cff?.final_type?.confidence_0to1)),
         definition: String(a?.cffFinalObj?.cff?.final_type?.definition ?? ""),
@@ -4571,15 +4614,7 @@ function assembleOutputJSON2(a: AssembleArgs): OutputJSON2 {
       summary_lines: Array.isArray(a?.rfsStyle?.rfs?.summary_lines)
         ? a.rfsStyle.rfs.summary_lines.map((x: any) => String(x))
         : [],
-      top_groups: Array.isArray(a?.rfsJob?.rfs?.top_groups)
-        ? a.rfsJob.rfs.top_groups.map((x: any) => {
-            if (typeof x === "string") return x;
-            if (x && typeof x === "object") {
-              return String((x as any).group_label ?? (x as any).label ?? (x as any).name ?? "");
-            }
-            return String(x ?? "");
-          })
-        : [],
+      top_groups: Array.isArray(a?.rfsJob?.rfs?.top_groups) ? a.rfsJob.rfs.top_groups.map((x: any) => String(x)) : [],
       recommended_roles_top3: Array.isArray(a?.rfsJob?.rfs?.recommended_roles_top3)
         ? a.rfsJob.rfs.recommended_roles_top3.map((x: any) => String(x))
         : [],
@@ -4644,7 +4679,7 @@ function clamp0to100_out(x: number): number {
 }
 
 
-export function deriveAll(input: GptBackendInput, opts: DeriveAllOptions = {}): any {
+export function deriveAllV2(input: GptBackendInput, opts: DeriveAllOptions = {}): any {
   const g = input ?? ({} as any);
 
   // ---------------------------------------------------------
@@ -4698,16 +4733,14 @@ export function deriveAll(input: GptBackendInput, opts: DeriveAllOptions = {}): 
   const cffPatternObj = computeCffPatternOut(coreAxes);
   const cffInput: CffInput = {
     indicators: {
-      // IndicatorStatus is a strict union: "Active" | "Excluded" | "Missing".
-      // For this test harness, present indicators are marked Active, absent ones Missing.
-      "AAS": { score: coreAxes.AAS, status: "Active" },
-      "CTF": { score: coreAxes.CTF, status: "Active" },
-      "RMD": { score: coreAxes.RMD, status: "Active" },
-      "RDX": { score: coreAxes.RDX, status: "Active" },
-      "EDS": { score: coreAxes.EDS, status: "Active" },
-      "IFD": { score: coreAxes.IFD, status: "Active" },
-      "KPF-Sim": { score: rawV1?.kpf_sim == null ? null : coreAxes.KPF_SIM, status: rawV1?.kpf_sim == null ? "Missing" : "Active" },
-      "TPS-H": { score: rawV1?.tps_h == null ? null : coreAxes.TPS_H, status: rawV1?.tps_h == null ? "Missing" : "Active" },
+      "AAS": { score: coreAxes.AAS, status: "OK" },
+      "CTF": { score: coreAxes.CTF, status: "OK" },
+      "RMD": { score: coreAxes.RMD, status: "OK" },
+      "RDX": { score: coreAxes.RDX, status: "OK" },
+      "EDS": { score: coreAxes.EDS, status: "OK" },
+      "IFD": { score: coreAxes.IFD, status: "OK" },
+      "KPF-Sim": { score: rawV1?.kpf_sim == null ? null : coreAxes.KPF_SIM, status: rawV1?.kpf_sim == null ? "N/A" : "OK" },
+      "TPS-H": { score: rawV1?.tps_h == null ? null : coreAxes.TPS_H, status: rawV1?.tps_h == null ? "N/A" : "OK" },
     },
   };
   const cffFinalObj = computeFinalDeterminationCff(cffInput);
@@ -4740,15 +4773,10 @@ export function deriveAll(input: GptBackendInput, opts: DeriveAllOptions = {}): 
 
   const rcDist = buildReasoningControlDistribution({ cfv, model: rcModel });
 
-  // Observed Structural Signals need a set of active IDs (S1..S18).
-  // In production you should pass rule-derived active IDs.
-  // For this Vercel test harness (where configs may be intentionally minimal),
-  // we provide a deterministic fallback to avoid hard-failing the endpoint.
+  // Observed Structural Signals require active IDs for exact matching.
   const activeIds = asSet(opts?.activeSignalIds);
   if (activeIds.size === 0) {
-    // Minimal stable default (4 lines) used across earlier report prototypes.
-    // REVISION: S1, S2 | TRANSITION: S5 | NONAUTO: S14
-    for (const id of ["S1", "S2", "S5", "S14"]) activeIds.add(id);
+    throw new Error("deriveAll: activeSignalIds is required for exact observed_structural_signals matching.");
   }
   const band = String(rcSummary?.rc?.reliability_band ?? "MEDIUM") as any;
   const selected = selectObservedSignals(activeIds, band, {});
@@ -4823,4 +4851,37 @@ export function deriveAll(input: GptBackendInput, opts: DeriveAllOptions = {}): 
   assertOutputJSON2(output);
 
   return output;
+}
+
+
+
+/* ============================================================
+   COMPAT WRAPPER (for older app code that called deriveAll(input, resources, signalPolicy))
+   - Maps legacy resource keys to DeriveAllOptions used by deriveAllV2.
+   ============================================================ */
+
+export type DeriveResourcesCompat = {
+  cohortFriList?: number[];
+  rc_model?: LogisticModel;
+  rcLogisticModel?: LogisticModel;
+  roleConfigs?: any[];
+  activeSignalIds?: Set<string> | string[];
+};
+
+export type ObservedSignalPolicyCompat = {
+  activeSignalIds?: Set<string> | string[];
+};
+
+export function deriveAll(
+  input: GptBackendInput,
+  resources: DeriveResourcesCompat = {},
+  signalPolicy: ObservedSignalPolicyCompat = {}
+): any {
+  const opts: DeriveAllOptions = {
+    cohortFriList: resources.cohortFriList,
+    rcLogisticModel: (resources.rc_model ?? resources.rcLogisticModel) as any,
+    activeSignalIds: (signalPolicy.activeSignalIds ?? resources.activeSignalIds) as any,
+    roleConfigs: resources.roleConfigs as any,
+  };
+  return deriveAllV2(input, opts);
 }
