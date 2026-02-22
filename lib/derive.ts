@@ -4441,10 +4441,19 @@ export type OutputJSON2 = {
     sri: { score: number; interpretation: string };
   };
   cff: {
-    pattern: { primary_label: string; secondary_label: string; definition: string };
-    final_type: { type_code: string; label: string; confidence_0to1: number; definition: string };
+    pattern: {
+      primary_label: string;
+      secondary_label: string;
+      definition: { primary: string; secondary: string };
+    };
+    final_type: {
+      label: string;
+      chip_label: string;
+      confidence: number; // 0..1
+      interpretation: string;
+    };
     labels: string[];
-    values_0to1: number[];
+    values_0to1: (number | "N/A")[];
   };
   rc: {
     summary: string;
@@ -4452,18 +4461,33 @@ export type OutputJSON2 = {
     reliability_band: string;
     band_rationale: string;
     pattern_interpretation: string;
-    observed_structural_signals: string[];
-    reasoning_control_distribution: { label: string; percent_0to100: number }[];
-    structural_control_signals: { label: string; value_0to1: number }[];
+    observed_structural_signals: { [k: string]: string };
+    reasoning_control_distribution: {
+      Human: string;
+      Hybrid: string;
+      AI: string;
+      final_determination: string;
+      determination_sentence: string;
+    };
+    structural_control_signals: { [k: string]: number };
   };
   rfs: {
+    primary_pattern: string;
+    representative_phrase: string;
     summary_lines: string[];
-    top_groups: string[];
+    top_groups: Array<{
+      group_name: string;
+      percent: number;
+      roles: string[];
+      recommended_role: string;
+    }>;
     recommended_roles_top3: string[];
     recommended_roles_line: string;
     pattern_interpretation: string;
   };
 };
+
+function extractTypeCodeFromLabel
 
 function extractTypeCodeFromLabel(label: string): string {
   // Expected formats:
@@ -4493,98 +4517,133 @@ type AssembleArgs = {
 };
 
 function assembleOutputJSON2(a: AssembleArgs): OutputJSON2 {
+  // ----------------------------
+  // Helpers (local, deterministic)
+  // ----------------------------
+  const safeStr = (v: any) => String(v ?? "");
+  const safeNum = (v: any) => numOr0(v);
+
+  const coercePatternDefinition = (d: any): { primary: string; secondary: string } => {
+    if (d && typeof d === "object") {
+      return {
+        primary: safeStr((d as any).primary),
+        secondary: safeStr((d as any).secondary),
+      };
+    }
+    if (typeof d === "string") {
+      // Some older assemblers stringified the object; recover if possible.
+      try {
+        const parsed = JSON.parse(d);
+        if (parsed && typeof parsed === "object") {
+          return {
+            primary: safeStr((parsed as any).primary),
+            secondary: safeStr((parsed as any).secondary),
+          };
+        }
+      } catch {}
+    }
+    return { primary: "", secondary: "" };
+  };
+
+  const coerceValues01 = (arr: any): (number | "N/A")[] => {
+    if (!Array.isArray(arr)) return [];
+    return arr.map((x: any) => {
+      if (x === "N/A") return "N/A";
+      if (typeof x === "string" && x.trim().toUpperCase() === "N/A") return "N/A";
+      const n = Number(x);
+      return Number.isFinite(n) ? clamp01_out(n) : ("N/A" as const);
+    });
+  };
+
+  // ----------------------------
+  // Assemble (JSON2 contract)
+  // ----------------------------
+  const sriObj = (a as any)?.rslSriObj?.rsl?.sri ?? (a as any)?.rslSriObj?.sri ?? null;
+
   const out: OutputJSON2 = {
     rsl: {
       level: {
-        short_name: String(a?.rslLevelObj?.rsl?.level?.short_name ?? ""),
-        full_name: String(a?.rslLevelObj?.rsl?.level?.full_name ?? ""),
-        definition: String(a?.rslLevelObj?.rsl?.level?.definition ?? ""),
+        short_name: safeStr(a?.rslLevelObj?.rsl?.level?.short_name),
+        full_name: safeStr(a?.rslLevelObj?.rsl?.level?.full_name),
+        definition: safeStr(a?.rslLevelObj?.rsl?.level?.definition),
       },
       fri: {
-        score: numOr0(a?.friObj?.rsl?.fri?.score),
-        interpretation: String(a?.friObj?.rsl?.fri?.interpretation ?? ""),
+        score: safeNum(a?.friObj?.rsl?.fri?.score),
+        interpretation: safeStr(a?.friObj?.rsl?.fri?.interpretation),
       },
       cohort: {
-        percentile_0to1: numOr0(a?.rslCohortObj?.rsl?.cohort?.percentile_0to1),
-        top_percent_label: String(a?.rslCohortObj?.rsl?.cohort?.top_percent_label ?? ""),
-        interpretation: String(a?.rslCohortObj?.rsl?.cohort?.interpretation ?? ""),
+        percentile_0to1: safeNum(a?.rslCohortObj?.rsl?.cohort?.percentile_0to1),
+        top_percent_label: safeStr(a?.rslCohortObj?.rsl?.cohort?.top_percent_label),
+        interpretation: safeStr(a?.rslCohortObj?.rsl?.cohort?.interpretation),
       },
       sri: {
-        score: numOr0(a?.rslSriObj?.rsl?.sri?.score),
-        interpretation: String(a?.rslSriObj?.rsl?.sri?.interpretation ?? ""),
+        score: safeNum((sriObj as any)?.score),
+        interpretation: safeStr((sriObj as any)?.interpretation),
       },
     },
+
     cff: {
       pattern: {
-        primary_label: String(a?.cffPatternObj?.cff?.pattern?.primary_label ?? ""),
-        secondary_label: String(a?.cffPatternObj?.cff?.pattern?.secondary_label ?? ""),
-        definition: (() => {
-          const d = a?.cffPatternObj?.cff?.pattern?.definition;
-          if (typeof d === "string") return d;
-          if (d && typeof d === "object") {
-            // Prefer common keys if present; otherwise stringify compactly.
-            const t = (d as any).text ?? (d as any).definition ?? (d as any).desc;
-            if (typeof t === "string") return t;
-            try { return JSON.stringify(d); } catch { return ""; }
-          }
-          return String(d ?? "");
-        })(),
+        primary_label: safeStr(a?.cffPatternObj?.cff?.pattern?.primary_label),
+        secondary_label: safeStr(a?.cffPatternObj?.cff?.pattern?.secondary_label),
+        definition: coercePatternDefinition(a?.cffPatternObj?.cff?.pattern?.definition),
       },
       final_type: {
-        type_code: (() => {
-          const explicit = a?.cffFinalObj?.cff?.final_type?.type_code;
-          if (typeof explicit === "string" && explicit.trim()) return explicit.trim();
-          return extractTypeCodeFromLabel(String(a?.cffFinalObj?.cff?.final_type?.label ?? ""));
-        })(),
-        label: String(a?.cffFinalObj?.cff?.final_type?.label ?? ""),
-        confidence_0to1: clamp01_out(numOr0(a?.cffFinalObj?.cff?.final_type?.confidence_0to1)),
-        definition: String(a?.cffFinalObj?.cff?.final_type?.definition ?? ""),
+        label: safeStr(a?.cffFinalObj?.cff?.final_type?.label),
+        chip_label: safeStr(a?.cffFinalObj?.cff?.final_type?.chip_label),
+        confidence: clamp01_out(safeNum(a?.cffFinalObj?.cff?.final_type?.confidence)),
+        interpretation: safeStr(a?.cffFinalObj?.cff?.final_type?.interpretation),
       },
-      labels: Array.isArray(a?.cffUi?.cff?.labels) ? a.cffUi.cff.labels.map((x: any) => String(x)) : [],
-      values_0to1: Array.isArray(a?.cffUi?.cff?.values_0to1)
-        ? a.cffUi.cff.values_0to1.map((x: any) => clamp01_out(numOr0(x)))
-        : [],
+      labels: Array.isArray(a?.cffUi?.cff?.labels) ? a.cffUi.cff.labels.map((x: any) => safeStr(x)) : [],
+      values_0to1: coerceValues01(a?.cffUi?.cff?.values_0to1),
     },
+
     rc: {
-      summary: String(a?.rcSummary?.rc?.summary ?? ""),
-      control_pattern: String(a?.rcSummary?.rc?.control_pattern ?? ""),
-      reliability_band: String(a?.rcSummary?.rc?.reliability_band ?? ""),
-      band_rationale: String(a?.rcSummary?.rc?.band_rationale ?? ""),
-      pattern_interpretation: String(a?.rcSummary?.rc?.pattern_interpretation ?? ""),
-      observed_structural_signals: Array.isArray(a?.rcObserved?.rc?.observed_structural_signals)
-        ? a.rcObserved.rc.observed_structural_signals.map((x: any) => String(x))
-        : [],
-      reasoning_control_distribution: Array.isArray(a?.rcDist?.rc?.reasoning_control_distribution)
-        ? a.rcDist.rc.reasoning_control_distribution.map((d: any) => ({
-            label: String(d?.label ?? ""),
-            percent_0to100: clamp0to100_out(numOr0(d?.percent_0to100)),
-          }))
-        : [],
-      structural_control_signals: Array.isArray(a?.rcStructural?.rc?.structural_control_signals)
-        ? a.rcStructural.rc.structural_control_signals.map((d: any) => ({
-            label: String(d?.label ?? ""),
-            value_0to1: clamp01_out(numOr0(d?.value_0to1)),
-          }))
-        : [],
+      summary: safeStr(a?.rcSummary?.rc?.summary),
+      control_pattern: safeStr(a?.rcSummary?.rc?.control_pattern),
+      reliability_band: safeStr(a?.rcSummary?.rc?.reliability_band),
+      band_rationale: safeStr(a?.rcSummary?.rc?.band_rationale),
+      pattern_interpretation: safeStr(a?.rcSummary?.rc?.pattern_interpretation),
+
+      observed_structural_signals:
+        (a as any)?.rcObserved?.rc?.observed_structural_signals && typeof (a as any).rcObserved.rc.observed_structural_signals === "object"
+          ? (a as any).rcObserved.rc.observed_structural_signals
+          : { "1": "", "2": "", "3": "", "4": "" },
+
+      reasoning_control_distribution:
+        (a as any)?.rcDist?.rc?.reasoning_control_distribution && typeof (a as any).rcDist.rc.reasoning_control_distribution === "object"
+          ? (a as any).rcDist.rc.reasoning_control_distribution
+          : { Human: "0%", Hybrid: "0%", AI: "0%", final_determination: "", determination_sentence: "" },
+
+      structural_control_signals:
+        (a as any)?.rcStructural?.rc?.structural_control_signals && typeof (a as any).rcStructural.rc.structural_control_signals === "object"
+          ? (a as any).rcStructural.rc.structural_control_signals
+          : {},
     },
+
     rfs: {
-      summary_lines: Array.isArray(a?.rfsStyle?.rfs?.summary_lines)
-        ? a.rfsStyle.rfs.summary_lines.map((x: any) => String(x))
+      primary_pattern: safeStr(a?.rfsStyle?.rfs?.primary_pattern),
+      representative_phrase: safeStr(a?.rfsStyle?.rfs?.representative_phrase),
+
+      summary_lines: Array.isArray(a?.rfsJob?.rfs?.summary_lines)
+        ? a.rfsJob.rfs.summary_lines.map((x: any) => safeStr(x))
         : [],
+
       top_groups: Array.isArray(a?.rfsJob?.rfs?.top_groups)
-        ? a.rfsJob.rfs.top_groups.map((x: any) => {
-            if (typeof x === "string") return x;
-            if (x && typeof x === "object") {
-              return String((x as any).group_label ?? (x as any).label ?? (x as any).name ?? "");
-            }
-            return String(x ?? "");
-          })
+        ? a.rfsJob.rfs.top_groups.map((g: any) => ({
+            group_name: safeStr(g?.group_name),
+            percent: Math.round(safeNum(g?.percent)),
+            roles: Array.isArray(g?.roles) ? g.roles.map((x: any) => safeStr(x)) : [],
+            recommended_role: safeStr(g?.recommended_role),
+          }))
         : [],
+
       recommended_roles_top3: Array.isArray(a?.rfsJob?.rfs?.recommended_roles_top3)
-        ? a.rfsJob.rfs.recommended_roles_top3.map((x: any) => String(x))
+        ? a.rfsJob.rfs.recommended_roles_top3.map((x: any) => safeStr(x))
         : [],
-      recommended_roles_line: String(a?.rfsJob?.rfs?.recommended_roles_line ?? ""),
-      pattern_interpretation: String(a?.rfsStyle?.rfs?.pattern_interpretation ?? ""),
+
+      recommended_roles_line: safeStr(a?.rfsJob?.rfs?.recommended_roles_line),
+      pattern_interpretation: safeStr(a?.rfsJob?.rfs?.pattern_interpretation),
     },
   };
 
@@ -4596,37 +4655,56 @@ function coerceOutputJSON2(out: OutputJSON2): void {
   out.cff.labels = Array.isArray(out.cff.labels) ? out.cff.labels : [];
   out.cff.values_0to1 = Array.isArray(out.cff.values_0to1) ? out.cff.values_0to1 : [];
 
-  out.rc.observed_structural_signals = Array.isArray(out.rc.observed_structural_signals) ? out.rc.observed_structural_signals : [];
-  out.rc.reasoning_control_distribution = Array.isArray(out.rc.reasoning_control_distribution) ? out.rc.reasoning_control_distribution : [];
-  out.rc.structural_control_signals = Array.isArray(out.rc.structural_control_signals) ? out.rc.structural_control_signals : [];
-
   out.rfs.summary_lines = Array.isArray(out.rfs.summary_lines) ? out.rfs.summary_lines : [];
   out.rfs.top_groups = Array.isArray(out.rfs.top_groups) ? out.rfs.top_groups : [];
   out.rfs.recommended_roles_top3 = Array.isArray(out.rfs.recommended_roles_top3) ? out.rfs.recommended_roles_top3 : [];
 
-  // Single-line role line (avoid accidental arrays/objects)
+  // Objects must exist
+  out.rc.observed_structural_signals =
+    out.rc.observed_structural_signals && typeof out.rc.observed_structural_signals === "object"
+      ? out.rc.observed_structural_signals
+      : { "1": "", "2": "", "3": "", "4": "" };
+
+  out.rc.reasoning_control_distribution =
+    out.rc.reasoning_control_distribution && typeof out.rc.reasoning_control_distribution === "object"
+      ? out.rc.reasoning_control_distribution
+      : { Human: "0%", Hybrid: "0%", AI: "0%", final_determination: "", determination_sentence: "" };
+
+  out.rc.structural_control_signals =
+    out.rc.structural_control_signals && typeof out.rc.structural_control_signals === "object"
+      ? out.rc.structural_control_signals
+      : {};
+
+  // Single-line role line
   out.rfs.recommended_roles_line = String((out as any)?.rfs?.recommended_roles_line ?? "");
 }
 
 function assertOutputJSON2(out: OutputJSON2): void {
-  // Hard-fail only on structural impossibilities (missing required objects).
-  // Do NOT validate content semantics here (to avoid changing formulas).
   const must = (cond: any, msg: string) => { if (!cond) throw new Error(msg); };
 
   must(out && typeof out === "object", "OutputJSON2: output is not an object");
   must(out.rsl && out.cff && out.rc && out.rfs, "OutputJSON2: missing top-level sections (rsl/cff/rc/rfs)");
 
+  // RSL
   must(out.rsl.level && typeof out.rsl.level.short_name === "string", "OutputJSON2: rsl.level.short_name missing");
   must(out.rsl.fri && typeof out.rsl.fri.score === "number", "OutputJSON2: rsl.fri.score missing");
   must(out.rsl.cohort && typeof out.rsl.cohort.percentile_0to1 === "number", "OutputJSON2: rsl.cohort.percentile_0to1 missing");
   must(out.rsl.sri && typeof out.rsl.sri.score === "number", "OutputJSON2: rsl.sri.score missing");
 
+  // CFF
   must(out.cff.pattern && typeof out.cff.pattern.primary_label === "string", "OutputJSON2: cff.pattern.primary_label missing");
-  must(out.cff.final_type && typeof out.cff.final_type.confidence_0to1 === "number", "OutputJSON2: cff.final_type.confidence_0to1 missing");
+  must(out.cff.pattern.definition && typeof out.cff.pattern.definition === "object", "OutputJSON2: cff.pattern.definition must be an object");
+  must(out.cff.final_type && typeof out.cff.final_type.confidence === "number", "OutputJSON2: cff.final_type.confidence missing");
 
+  // RC
   must(typeof out.rc.summary === "string", "OutputJSON2: rc.summary missing");
-  must(Array.isArray(out.rc.observed_structural_signals), "OutputJSON2: rc.observed_structural_signals must be array");
+  must(out.rc.observed_structural_signals && typeof out.rc.observed_structural_signals === "object", "OutputJSON2: rc.observed_structural_signals must be object");
+  must(out.rc.reasoning_control_distribution && typeof out.rc.reasoning_control_distribution === "object", "OutputJSON2: rc.reasoning_control_distribution must be object");
+  must(out.rc.structural_control_signals && typeof out.rc.structural_control_signals === "object", "OutputJSON2: rc.structural_control_signals must be object");
 
+  // RFS
+  must(typeof out.rfs.primary_pattern === "string", "OutputJSON2: rfs.primary_pattern missing");
+  must(typeof out.rfs.representative_phrase === "string", "OutputJSON2: rfs.representative_phrase missing");
   must(typeof out.rfs.recommended_roles_line === "string", "OutputJSON2: rfs.recommended_roles_line missing");
 }
 
