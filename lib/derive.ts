@@ -2218,6 +2218,7 @@ export function computeFinalDeterminationCff(
       final_type: {
         label,
         chip_label: chipLabel,
+        type_code: extractTypeCodeFromLabel(label),
         confidence,
         interpretation,
       },
