@@ -4500,31 +4500,8 @@ export type OutputJSON2 = {
   };
 };
 
-function extractTypeCodeFromLabel(label: string): string {
-  // Handles common formats:
-  // - "T2"
-  // - "T2. Reflective Thinker"
-  // - "Ax-4. Reasoning Simulator"
-  // - "Ax-4 Reasoning Simulator"
-  // - "L3" (rare in CFF; included for safety)
-  // Returns "UNK" if not detectable.
-  const s = String(label ?? "").trim();
-  if (!s) return "UNK";
 
-  // 1) Ax-4 / Hx-1 / etc (two-letter code ending with 'x' + dash + digits)
-  const mAx = /^([A-Za-z]{1,3}x-\d+)/.exec(s);
-  if (mAx?.[1]) return mAx[1];
 
-  // 2) Generic code-with-dash digits (e.g., "A-7")
-  const mDash = /^([A-Za-z]{1,4}-\d+)/.exec(s);
-  if (mDash?.[1]) return mDash[1];
-
-  // 3) T2 / R3 style (letter(s) + digits)
-  const mTD = /^([A-Za-z]{1,3}\d+)/.exec(s);
-  if (mTD?.[1]) return mTD[1];
-
-  return "UNK";
-}
 
 type AssembleArgs = {
   rslLevelObj: any;
