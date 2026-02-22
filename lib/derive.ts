@@ -4370,6 +4370,21 @@ function boolOrU(x: any): boolean | undefined {
   return !!x;
 }
 
+function strArrOrU(x: any): string[] | undefined {
+  if (x == null) return undefined;
+  if (Array.isArray(x)) {
+    const out = x.map((v) => (v == null ? '' : String(v))).filter((s) => s.trim().length > 0);
+    return out.length ? out : undefined;
+  }
+  // allow comma-separated strings
+  if (typeof x === 'string') {
+    const parts = x.split(',').map((s) => s.trim()).filter(Boolean);
+    return parts.length ? parts : undefined;
+  }
+  // numbers/objects are not representable as string[] in JSON2 contract
+  return undefined;
+}
+
 
 function pickRawFeaturesV1(input: any): RawFeaturesV1 {
   const rf = input?.raw_features ?? input ?? {};
@@ -4386,7 +4401,7 @@ function pickRawFeaturesV1(input: any): RawFeaturesV1 {
     transitions: numOr0(rf?.layer_2?.transitions),
     transition_ok: numOr0(rf?.layer_2?.transition_ok),
     belief_change: boolOrU(rf?.layer_2?.belief_change),
-    evidence_types: rf?.layer_2?.evidence_types == null ? undefined : numOr0(rf?.layer_2?.evidence_types),
+    evidence_types: strArrOrU(rf?.layer_2?.evidence_types),
     adjacency_links: rf?.layer_2?.adjacency_links == null ? undefined : numOr0(rf?.layer_2?.adjacency_links),
 
     revisions: numOr0(rf?.layer_2?.revisions),
