@@ -1,0 +1,140 @@
+{
+  "raw_features": {
+    "layer_0": {
+      "units": 6,
+      "unit_lengths": [
+        119,
+        67,
+        355,
+        73,
+        262,
+        508
+      ],
+      "per_unit": {
+        "transitions": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          0
+        ],
+        "revisions": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "claims": 7,
+      "reasons": 3,
+      "evidence": 0
+    },
+    "layer_1": {
+      "sub_claims": 3,
+      "warrants": 3,
+      "counterpoints": 0,
+      "refutations": 0,
+      "structure_type": null
+    },
+    "layer_2": {
+      "transitions": 5,
+      "transition_types": [],
+      "transition_ok": 5,
+      "revisions": 0,
+      "revision_depth_sum": 0.0,
+      "belief_change": false
+    },
+    "layer_3": {
+      "intent_markers": 0,
+      "drift_segments": 0,
+      "hedges": 12,
+      "loops": 0,
+      "self_regulation_signals": 0
+    },
+    "evidence_types": {
+      "example": 3,
+      "data": 0,
+      "authority": 0,
+      "analogy": 0,
+      "counterexample": 0,
+      "experience": 0,
+      "theory": 0
+    },
+    "adjacency_links": 3,
+    "backend_reserved": {
+      "kpf_sim": null,
+      "tps_h": null
+    }
+  },
+  "rsl_rubric": {
+    "coherence": 5,
+    "structure": 3,
+    "evaluation": 2,
+    "integration": 3
+  },
+  "rsl": {
+    "summary": {
+      "one_line": "The response presents a three-factor validity critique using ordered factor claims and illustrative scenarios.",
+      "paragraph": "The reasoning moves from an overall claim about internal validity to three sequential threats, each paired with a brief scenario and a causal link to overestimation. The strongest feature is its stable ordering and repeated connector pattern that keeps the reader oriented across factors. A limitation is that support remains illustrative rather than grounded in external sources or explicit evaluation criteria, which narrows the defensibility of the critique. If expanded, the argument could strengthen decision value by stating what evidence would distinguish gum effects from history, maturation, and selection influences."
+    },
+    "dimensions": [
+      {
+        "code": "R1",
+        "label": "Interpretation",
+        "score_1to5": 4,
+        "observation": "The response interprets the task as an internal validity analysis and frames the main issue as potential misestimation of results. It specifies a bounded set of three factors that will structure the reasoning path. A next step would be to clarify the experimental setting assumptions that make these factors most likely to operate."
+      },
+      {
+        "code": "R2",
+        "label": "Issue Decomposition",
+        "score_1to5": 3,
+        "observation": "The reasoning decomposes the critique into three distinct threats and treats each as a separate sub-claim. Each sub-claim is linked to a similar causal pattern explaining how the observed outcome could shift. Going forward, the analysis could map how these factors interact or compound across the same experimental timeline."
+      },
+      {
+        "code": "R3",
+        "label": "Evidence Quality",
+        "score_1to5": 2,
+        "observation": "Support is provided as hypothetical scenarios rather than external data, citations, or documented findings. The examples illustrate plausibility but do not function as verifiable evidence that changes the inference strength. To improve, the response could indicate what measurable indicators or records would validate each threat."
+      },
+      {
+        "code": "R4",
+        "label": "Reasoning & Counterfactuals",
+        "score_1to5": 3,
+        "observation": "The response uses causal reasoning to argue that observed smoking reductions could arise from factors other than the gum. It repeatedly contrasts an alternative cause against the focal treatment effect, shaping a consistent inference. A useful extension would be to specify concrete counterfactual checks, such as comparing trends in a matched control group."
+      },
+      {
+        "code": "R5",
+        "label": "Coherence & Clarity",
+        "score_1to5": 4,
+        "observation": "Connectors and repeated phrasing maintain a clear line across the three-factor structure. Each factor follows a consistent pattern of claim, example, and consequence statement that supports readability. Next, the clarity could be strengthened by tightening redundancy and making the causal language more precise where it repeats."
+      },
+      {
+        "code": "R6",
+        "label": "Metacognition & Self-repair",
+        "score_1to5": 0,
+        "observation": "There is no explicit self-monitoring language that revises or corrects earlier statements within the response. The argument progresses linearly without reflecting on uncertainty sources beyond modal phrasing. A forward-looking improvement would be to add a brief check on which factor is most plausible under specified experimental conditions."
+      },
+      {
+        "code": "R7",
+        "label": "Ethical / Societal Framing",
+        "score_1to5": 0,
+        "observation": "The response focuses on methodological validity and does not introduce ethical considerations or societal implications. Values do not appear to constrain the conclusion or shape trade-offs in the reasoning. If desired, the analysis could extend by noting implications for how cessation interventions should be evaluated responsibly in older populations."
+      },
+      {
+        "code": "R8",
+        "label": "Perspective Flexibility",
+        "score_1to5": 1,
+        "observation": "Alternative causes are listed across factors, but the response stays within a single analytic perspective of validity threats. It does not compare stakeholder viewpoints or shift interpretive frames to alter the reasoning direction. A next step could be to contrast how a researcher, clinician, and participant might differently interpret the same outcome shift."
+      }
+    ]
+  },
+  "raw_signals_quotes": {
+    "A7_value_aware_quote_candidates": [],
+    "A8_perspective_flexible_quote_candidates": [],
+    "self_repair_quote_candidates": [],
+    "framework_generation_quote_candidates": []
+  }
+}
