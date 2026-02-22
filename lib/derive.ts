@@ -30,6 +30,16 @@ function safeNum(x: unknown, fallback = 0): number {
   return isFiniteNumber(x) ? x : fallback;
 }
 
+
+function safeStr(x: unknown, fallback = ""): string {
+  if (typeof x === "string") return x;
+  if (x === null || x === undefined) return fallback;
+  try {
+    return String(x);
+  } catch {
+    return fallback;
+  }
+}
 function extractTypeCodeFromLabel(label: unknown): string {
   const s = safeStr(label);
   // Expected label formats: "Ax-4. Reasoning Simulator", "T2. Reflective Thinker", etc.
@@ -2211,6 +2221,7 @@ export function computeFinalDeterminationCff(
     cff: {
       final_type: {
         label,
+        type_code: extractTypeCodeFromLabel(label),
         chip_label: chipLabel,
         confidence,
         interpretation,
@@ -4498,17 +4509,6 @@ export type OutputJSON2 = {
     pattern_interpretation: string;
   };
 };
-
-function extractTypeCodeFromLabel(label: string): string {
-  // Expected formats:
-  // - "T2"
-  // - "T2. Reflective Thinker"
-  // - "T2 Reflective Thinker"
-  // If unknown, return "T0".
-  const s = String(label ?? "").trim();
-  const m = /^T\d+/.exec(s);
-  return m?.[0] ?? "T0";
-}
 
 type AssembleArgs = {
   rslLevelObj: any;
