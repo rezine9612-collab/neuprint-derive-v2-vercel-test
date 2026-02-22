@@ -4682,14 +4682,16 @@ export function deriveAll(input: GptBackendInput, opts: DeriveAllOptions = {}): 
   const cffPatternObj = computeCffPatternOut(coreAxes);
   const cffInput: CffInput = {
     indicators: {
-      "AAS": { score: coreAxes.AAS, status: "OK" },
-      "CTF": { score: coreAxes.CTF, status: "OK" },
-      "RMD": { score: coreAxes.RMD, status: "OK" },
-      "RDX": { score: coreAxes.RDX, status: "OK" },
-      "EDS": { score: coreAxes.EDS, status: "OK" },
-      "IFD": { score: coreAxes.IFD, status: "OK" },
-      "KPF-Sim": { score: rawV1?.kpf_sim == null ? null : coreAxes.KPF_SIM, status: rawV1?.kpf_sim == null ? "N/A" : "OK" },
-      "TPS-H": { score: rawV1?.tps_h == null ? null : coreAxes.TPS_H, status: rawV1?.tps_h == null ? "N/A" : "OK" },
+      // IndicatorStatus is a strict union: "Active" | "Excluded" | "Missing".
+      // For this test harness, present indicators are marked Active, absent ones Missing.
+      "AAS": { score: coreAxes.AAS, status: "Active" },
+      "CTF": { score: coreAxes.CTF, status: "Active" },
+      "RMD": { score: coreAxes.RMD, status: "Active" },
+      "RDX": { score: coreAxes.RDX, status: "Active" },
+      "EDS": { score: coreAxes.EDS, status: "Active" },
+      "IFD": { score: coreAxes.IFD, status: "Active" },
+      "KPF-Sim": { score: rawV1?.kpf_sim == null ? null : coreAxes.KPF_SIM, status: rawV1?.kpf_sim == null ? "Missing" : "Active" },
+      "TPS-H": { score: rawV1?.tps_h == null ? null : coreAxes.TPS_H, status: rawV1?.tps_h == null ? "Missing" : "Active" },
     },
   };
   const cffFinalObj = computeFinalDeterminationCff(cffInput);
