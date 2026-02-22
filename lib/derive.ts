@@ -1201,6 +1201,10 @@ export type RawFeaturesV1 = {
   // 5) EDS
   evidence_types?: string[]; // set 취급
 
+  // (optional) structural adjacency density / link count
+  // NOTE: 일부 raw_features 생성기에서 layer_2.adjacency_links(숫자)로 제공될 수 있음.
+  adjacency_links?: number;
+
   // 6) IFD
   intent_markers: number;
   drift_segments?: number;
