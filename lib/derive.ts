@@ -4471,6 +4471,7 @@ export type OutputJSON2 = {
     };
     final_type: {
       label: string;
+      type_code: string;
       chip_label: string;
       confidence: number; // 0..1
       interpretation: string;
