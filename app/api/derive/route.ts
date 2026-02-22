@@ -61,7 +61,9 @@ export async function GET() {
     const out = deriveAll(input, {
       rcLogisticModel: { beta0: 0, betas: {}, z_clip: 8 },
       roleConfigs: [],
-      activeSignalIds: [],
+      // Minimal deterministic defaults so the harness always returns
+      // the canonical 4 observed structural signals.
+      activeSignalIds: ['S1', 'S2', 'S5', 'S14'],
       cohortFriList: [],
     } as any);
 
