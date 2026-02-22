@@ -4,11 +4,14 @@ import { useMemo, useState } from 'react';
 
 type ApiResult = {
   ok: boolean;
+  build_tag?: string;
   generated_at_utc?: string;
   problems?: string[];
   output?: any;
   error?: string;
 };
+
+const BUILD_TAG = 'NP-DERIVE-V2-FIXED8';
 
 export default function Page() {
   const [loading, setLoading] = useState(false);
@@ -36,6 +39,7 @@ export default function Page() {
   return (
     <main style={{ maxWidth: 980, margin: '0 auto', padding: 24 }}>
       <h1 style={{ margin: '8px 0 12px', fontSize: 24 }}>NeuPrint DERIVE V2, Vercel Test Harness</h1>
+      <div style={{ margin: '0 0 10px', fontSize: 12, opacity: 0.75 }}>Build: {BUILD_TAG}</div>
       <p style={{ margin: 0, lineHeight: 1.5, opacity: 0.85 }}>
         This app runs <code>lib/derive.ts</code> server-side using a fixed fixture at <code>fixtures/raw_feature.json</code>,
         then returns JSON2-style output plus a simple validation report.
@@ -77,6 +81,9 @@ export default function Page() {
             </div>
             {res.generated_at_utc && (
               <div style={{ opacity: 0.8 }}>generated_at_utc: {res.generated_at_utc}</div>
+            )}
+            {res.build_tag && (
+              <div style={{ opacity: 0.8 }}>build_tag: {res.build_tag}</div>
             )}
             {Array.isArray(res.problems) && res.problems.length > 0 && (
               <ul style={{ margin: '10px 0 0', paddingLeft: 18 }}>

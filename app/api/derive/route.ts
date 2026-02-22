@@ -9,6 +9,8 @@ import { deriveAll } from '../../../lib/derive';
 // Ensure this route runs in the Node.js runtime on Vercel (fs/path are Node-only).
 export const runtime = 'nodejs';
 
+const BUILD_TAG = 'NP-DERIVE-V2-FIXED8';
+
 function readFixture(): any {
   const p = path.join(process.cwd(), 'fixtures', 'raw_feature.json');
   const raw = fs.readFileSync(p, 'utf-8');
@@ -71,6 +73,7 @@ export async function GET() {
 
     return NextResponse.json({
       ok: problems.length === 0,
+      build_tag: BUILD_TAG,
       generated_at_utc: new Date().toISOString(),
       problems,
       output: out,
@@ -79,6 +82,7 @@ export async function GET() {
     return NextResponse.json(
       {
         ok: false,
+        build_tag: BUILD_TAG,
         generated_at_utc: new Date().toISOString(),
         problems: ['Exception thrown in /api/derive'],
         error: String(e?.stack ?? e?.message ?? e),
