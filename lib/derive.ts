@@ -4984,7 +4984,7 @@ export function deriveAll(input: GptBackendInput, opts: DeriveAllOptions = {}): 
             "Reasoning decisions originate from explicit human-driven revision and counter-evaluative judgment rather than automated continuation flow.",
           pattern_interpretation:
             "A high human proportion indicates stable human-led control at structural decision boundaries across the task.",
-          observed_structural_signals: rcSummaryComputed?.rc?.observed_structural_signals ?? {},
+          // observed_structural_signals is emitted via rcObserved.rc.observed_structural_signals
         },
       };
 
