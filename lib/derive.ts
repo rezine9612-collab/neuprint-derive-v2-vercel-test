@@ -4878,7 +4878,7 @@ export function deriveAll(input: GptBackendInput, opts: DeriveAllOptions = {}): 
     g?.rsl_rubric?.dimensions ??
     g?.rsl_rubric?.rsl?.dimensions ??
     g?.rsl_rubric?.rsl_dimensions ??
-    g?.rsl_dimensions ??
+    (g as any)?.rsl_dimensions ??
     null;
   return Array.isArray(cand) ? cand : [];
 })();
