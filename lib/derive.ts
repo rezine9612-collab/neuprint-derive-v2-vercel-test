@@ -4860,16 +4860,11 @@ export function deriveAll(input: GptBackendInput, opts: DeriveAllOptions = {}): 
       ];
 
   const defaultRcModel: LogisticModel = {
-    // This is a deterministic placeholder model that reproduces the FIXTURE expectations.
-    // If caller provides rcLogisticModel, it overrides this.
-    intercept: -0.15,
-    weights: {
-      structural_variance: 1.25,
-      human_rhythm_index: 1.10,
-      transition_flow: 0.95,
-      revision_depth: 1.35,
-    },
-    calibration: { method: "platt", a: 1, b: 0 },
+    // Deterministic fallback model (used only if caller does not provide rcLogisticModel).
+    // NOTE: Must match the LogisticModel interface (beta0, betas, optional z_clip).
+    beta0: -0.15,
+    betas: {},
+    z_clip: 20,
   };
 
     const hasRcModel = !!(opts as any)?.rcLogisticModel;
