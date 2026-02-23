@@ -3672,16 +3672,7 @@ export function toRcJson(result: SelectObservedSignalsResult): ObservedSignalsRc
   };
 }
 
-/* -------------------------
-   Example usage (Node/TS runtime)
--------------------------- */
-if (require?.main === module) {
-  const active = new Set<string>(["S1", "S2", "S5", "S9", "S14", "S11", "S17"]);
-  const selected = selectObservedSignals(active, "HIGH");
-  const out = toRcJson(selected);
-  // eslint-disable-next-line no-console
-  console.log(JSON.stringify(out, null, 2));
-}
+
 
 
 /* ===== Backend_12_Cognitive Style Summary.ts ===== */
@@ -5004,7 +4995,7 @@ export function deriveAll(input: GptBackendInput, opts: DeriveAllOptions = {}): 
       };
 
   const selectedObserved = selectObservedSignals(
-    asSet(opts.activeSignalIds ?? []),
+    new Set<string>((opts.activeSignalIds ?? []).map(String)),
     (rcSummaryComputed?.rc?.reliability_band as Band) ?? "MEDIUM",
     { displayLines: 4 }
   );
@@ -5037,9 +5028,11 @@ export function deriveAll(input: GptBackendInput, opts: DeriveAllOptions = {}): 
     return m ? Number(m[1]) : 3;
   })();
 
+  let rfsTop3: any = null;
+
   if (!hasRoleConfigs) {
     // Fixture-safe fallback (no external roleConfigs provided)
-    var rfsTop3: any = {
+    rfsTop3 = {
       rfs: {
         summary_lines: [
           "Strategy·Analysis·Policy: 78%",
@@ -5114,6 +5107,6 @@ export function deriveAll(input: GptBackendInput, opts: DeriveAllOptions = {}): 
       axes: axes,
     };
 
-    var rfsTop3 = computeRfsJobGroupTop3(roleFitInput, roleConfigs, { strictMinFilter: true });
+    rfsTop3 = computeRfsJobGroupTop3(roleFitInput, roleConfigs, { strictMinFilter: true });
   }
 }
