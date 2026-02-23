@@ -4995,7 +4995,12 @@ export function deriveAll(input: GptBackendInput, opts: DeriveAllOptions = {}): 
       };
 
   const selectedObserved = selectObservedSignals(
-    new Set<string>((opts.activeSignalIds ?? []).map(String)),
+    new Set<string>(
+      (Array.isArray(opts.activeSignalIds)
+        ? opts.activeSignalIds
+        : Array.from(opts.activeSignalIds ?? new Set<string>()))
+        .map(String)
+    ),
     (rcSummaryComputed?.rc?.reliability_band as Band) ?? "MEDIUM",
     { displayLines: 4 }
   );
