@@ -4859,7 +4859,7 @@ export function deriveAll(input: GptBackendInput, opts: DeriveAllOptions = {}): 
         0.4,0.7,1.1,1.4,1.8,2.1,2.4,2.7,3.0,3.2,3.4,3.6,3.8,4.0,4.2,4.4
       ];
 
-  const defaultRcModel: LogisticModel = (defaultRcModel as any) ?? {
+  const defaultRcModel: LogisticModel = {
     // This is a deterministic placeholder model that reproduces the FIXTURE expectations.
     // If caller provides rcLogisticModel, it overrides this.
     intercept: -0.15,
