@@ -5002,7 +5002,13 @@ export function deriveAll(input: GptBackendInput, opts: DeriveAllOptions = {}): 
           },
         },
       };
-const rcObserved = toRcJson(selected);
+
+  const selectedObserved = selectObservedSignals(
+    asSet(opts.activeSignalIds ?? []),
+    (rcSummaryComputed?.rc?.reliability_band as Band) ?? "MEDIUM",
+    { displayLines: 4 }
+  );
+  const rcObserved = toRcJson(selectedObserved);
 
   // ---------------------------------------------------------
   // 4) RFS: style -> job top3
