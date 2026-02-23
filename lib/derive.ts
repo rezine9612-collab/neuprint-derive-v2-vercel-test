@@ -760,9 +760,11 @@ export type RawFeatures = {
     evidence?: number;
   };
   layer_1?: {
+    sub_claims?: number;
     warrants?: number;
     counterpoints?: number;
     refutations?: number;
+    structure_type?: string | null;
   };
   layer_2?: {
     transitions?: number;
@@ -778,7 +780,15 @@ export type RawFeatures = {
     loops?: number;
     self_regulation_signals?: number;
   };
+
+  // Canonical raw_features also provides these at the top-level.
+  evidence_types?: Record<string, number> | string[]; // accept both
   adjacency_links?: number;
+
+  backend_reserved?: {
+    kpf_sim?: number | null;
+    tps_h?: number | null;
+  };
 };
 
 export type RslRubric4 = {
@@ -3568,38 +3578,51 @@ export function selectObservedSignals(
     candidates.push(t);
   }
 
-  // Pick best (lowest priority number) within a group
-  const pickBest = (group: SignalGroup): SignalTemplate | undefined => {
-    let best: SignalTemplate | undefined;
-    for (const t of candidates) {
-      if (t.group !== group) continue;
-      if (!best || t.priority < best.priority) best = t;
-    }
-    return best;
+  // Pick top-k (lowest priority numbers) within a group
+  const pickTop = (group: SignalGroup, k: number): SignalTemplate[] => {
+    const arr = candidates
+      .filter((t) => t.group === group)
+      .sort((a, b) => a.priority - b.priority);
+    return arr.slice(0, Math.max(0, Math.floor(k)));
   };
 
   const selected: SignalTemplate[] = [];
 
-  // 1) Core groups, one each (fixed order)
-  const coreGroupOrder: SignalGroup[] = [
-    "REVISION",
-    "TRANSITION",
-    "COUNTER",
-    "NONAUTO",
+  // 1) Core groups (fixed order)
+  // Backend JSON2 reference uses:
+  // - up to 2 REVISION lines first (e.g., S1 + S2),
+  // - then 1 TRANSITION,
+  // - then 1 NONAUTO,
+  // so the default 4-line set becomes: S1, S2, S5, S14.
+  const corePlan: Array<{ group: SignalGroup; k: number }> = [
+    { group: "REVISION", k: 2 },
+    { group: "TRANSITION", k: 1 },
+    { group: "COUNTER", k: 1 },
+    { group: "NONAUTO", k: 1 },
   ];
 
-  for (const g of coreGroupOrder) {
+  for (const step of corePlan) {
     if (selected.length >= displayLines) break;
-    const t = pickBest(g);
-    if (t && !selected.some((x) => x.id === t.id)) selected.push(t);
+    const picks = pickTop(step.group, step.k);
+    for (const t of picks) {
+      if (selected.length >= displayLines) break;
+      if (!selected.some((x) => x.id === t.id)) selected.push(t);
+    }
   }
 
   // 2) Fill from EVIDENCE then SPECIFICITY
-  const fillGroupOrder: SignalGroup[] = ["EVIDENCE", "SPECIFICITY"];
-  for (const g of fillGroupOrder) {
+  const fillPlan: Array<{ group: SignalGroup; k: number }> = [
+    { group: "EVIDENCE", k: 1 },
+    { group: "SPECIFICITY", k: 1 },
+  ];
+
+  for (const step of fillPlan) {
     if (selected.length >= displayLines) break;
-    const t = pickBest(g);
-    if (t && !selected.some((x) => x.id === t.id)) selected.push(t);
+    const picks = pickTop(step.group, step.k);
+    for (const t of picks) {
+      if (selected.length >= displayLines) break;
+      if (!selected.some((x) => x.id === t.id)) selected.push(t);
+    }
   }
 
   // 3) Final fill from remaining candidates by priority
@@ -4414,7 +4437,36 @@ function strArrOrU(x: any): string[] | undefined {
 
 
 function pickRawFeaturesV1(input: any): RawFeaturesV1 {
+  // Accept either:
+  //  - { raw_features: { ... } } (recommended)
+  //  - { ... } (raw_features itself)
   const rf = input?.raw_features ?? input ?? {};
+
+  // Canonical raw_features uses TOP-LEVEL evidence_types + adjacency_links,
+  // but some older generators placed them under layer_2.
+  const evidenceTypesAny = rf?.evidence_types ?? rf?.layer_2?.evidence_types;
+  const evidence_types = (() => {
+    // Accept string[] directly
+    if (Array.isArray(evidenceTypesAny)) return strArrOrU(evidenceTypesAny);
+    // Accept Record<string, number> and convert to key list
+    if (evidenceTypesAny && typeof evidenceTypesAny === "object") {
+      try {
+        const keys = Object.keys(evidenceTypesAny).filter((k) => {
+          const v = (evidenceTypesAny as any)[k];
+          return typeof v === "number" ? v > 0 : v != null;
+        });
+        return keys.length ? keys : undefined;
+      } catch {
+        return undefined;
+      }
+    }
+    return undefined;
+  })();
+
+  const adjacency_links_any = rf?.adjacency_links ?? rf?.layer_2?.adjacency_links;
+
+  const backendReserved = rf?.backend_reserved ?? rf?.backendReserved ?? null;
+
   return {
     units: numOr0(rf?.layer_0?.units),
     claims: numOr0(rf?.layer_0?.claims),
@@ -4428,8 +4480,9 @@ function pickRawFeaturesV1(input: any): RawFeaturesV1 {
     transitions: numOr0(rf?.layer_2?.transitions),
     transition_ok: numOr0(rf?.layer_2?.transition_ok),
     belief_change: boolOrU(rf?.layer_2?.belief_change),
-    evidence_types: strArrOrU(rf?.layer_2?.evidence_types),
-    adjacency_links: rf?.layer_2?.adjacency_links == null ? undefined : numOr0(rf?.layer_2?.adjacency_links),
+
+    evidence_types,
+    adjacency_links: adjacency_links_any == null ? undefined : numOr0(adjacency_links_any),
 
     revisions: numOr0(rf?.layer_2?.revisions),
     revision_depth_sum: numOr0(rf?.layer_2?.revision_depth_sum),
@@ -4439,9 +4492,10 @@ function pickRawFeaturesV1(input: any): RawFeaturesV1 {
     intent_markers: numOr0(rf?.layer_3?.intent_markers),
     drift_segments: numOr0(rf?.layer_3?.drift_segments),
 
-    kpf_sim: rf?.backend_reserved?.kpf_sim ?? null,
-    tps_h: rf?.backend_reserved?.tps_h ?? null,
+    kpf_sim: backendReserved?.kpf_sim ?? null,
+    tps_h: backendReserved?.tps_h ?? null,
   };
+}
 }
 
 function requireOrThrow<T>(v: T | undefined | null, msg: string): T {
