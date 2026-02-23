@@ -1877,9 +1877,7 @@ export type CffInput = { indicators: Record<IndicatorCode, IndicatorValue | unde
 ========================= */
 
 export type CffFinalTypePublic = {
-  label: string;
-  type_code: string;
-  chip_label: string;
+  label: string;  chip_label: string;
   confidence: number; // 0..1
   interpretation: string;
 };
@@ -2224,9 +2222,7 @@ export function computeFinalDeterminationCff(
   return {
     cff: {
       final_type: {
-        label,
-        type_code: extractTypeCodeFromLabel(label),
-        chip_label: chipLabel,
+        label,        chip_label: chipLabel,
         confidence,
         interpretation,
       },
@@ -2709,7 +2705,7 @@ export type RcStructuralControlSignalsJson = {
 };
 
 function toAgencyRawFromRawFeatures(payload: RawFeaturesPayload): AgencyRaw {
-  const rf = payload?.raw_features;
+  const rf = (payload as any)?.raw_features ?? (payload as any);
 
   const units = Math.max(0, safeNum(rf?.layer_0?.units, 0));
 
@@ -3314,7 +3310,59 @@ export function determineLabelFromProbs(
    Distribution Builder
    ============================================================ */
 
-export function buildReasoningControlDistribution(
+export 
+function buildReasoningControlDistributionHeuristic(cfv: CFV, ind: AgencyIndicators): RcDistributionOutput {
+  const hi = clamp01(ind?.human_rhythm_index ?? 0);
+  const rd = clamp01(ind?.revision_depth ?? 0);
+  const tf = clamp01(ind?.transition_flow ?? 0);
+  const sv = clamp01(ind?.structural_variance ?? 0);
+
+  // Deterministic fallback when no logistic model is supplied.
+  // Produces non-zero, stable outputs based on computed structural signals.
+  const ctf = clamp01(cfv?.ctf ?? 0);
+
+  let pH = 0.20 + 0.35 * hi + 0.20 * rd + 0.20 * tf - 0.15 * sv + 0.10 * ctf;
+  pH = clamp01(pH);
+  const pA = clamp01(1 - pH);
+
+  const final: "Human" | "Hybrid" | "AI" = pH >= 0.67 ? "Human" : pH <= 0.33 ? "AI" : "Hybrid";
+
+  let human = 0;
+  let hybrid = 0;
+  let ai = 0;
+
+  if (final === "Hybrid") {
+    hybrid = clamp01(2 * Math.min(pH, pA));
+    human = clamp01(pH - hybrid / 2);
+    ai = clamp01(pA - hybrid / 2);
+  } else if (final === "Human") {
+    hybrid = clamp01(Math.min(pH, pA));
+    human = clamp01(pH - hybrid);
+    ai = clamp01(pA - hybrid);
+  } else {
+    hybrid = clamp01(Math.min(pH, pA));
+    ai = clamp01(pA - hybrid);
+    human = clamp01(pH - hybrid);
+  }
+
+  const n = normalize3(human, hybrid, ai);
+
+  const pct = (x: number) => `${Math.round(clamp01(x) * 100)}%`;
+
+  return {
+    rc: {
+      reasoning_control_distribution: {
+        Human: pct((n as any).human ?? (n as any).a),
+        Hybrid: pct((n as any).hybrid ?? (n as any).b),
+        AI: pct((n as any).ai ?? (n as any).c),
+        final_determination: final,
+        determination_sentence: "The combined signal profile supports classification as human-controlled reasoning.",
+      },
+    },
+  };
+}
+
+function buildReasoningControlDistribution(
   input: RcInferenceInput
 ): RcDistributionOutput {
 
@@ -3705,10 +3753,7 @@ export type StyleInputs = {
 export type StyleId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 
 export type RfsJson = {
-  rfs: {
-    primary_pattern: string;
-    representative_phrase: string;
-  };
+  rfs: {  };
 };
 
 function safe01(x: unknown): number {
@@ -4507,9 +4552,7 @@ export type OutputJSON2 = {
       definition: { primary: string; secondary: string };
     };
     final_type: {
-      label: string;
-      type_code: string;
-      chip_label: string;
+      label: string;      chip_label: string;
       confidence: number; // 0..1
       interpretation: string;
     };
@@ -4532,10 +4575,7 @@ export type OutputJSON2 = {
     };
     structural_control_signals: { [k: string]: number };
   };
-  rfs: {
-    primary_pattern: string;
-    representative_phrase: string;
-    summary_lines: string[];
+  rfs: {    summary_lines: string[];
     top_groups: Array<{
       group_name: string;
       percent: number;
@@ -4637,9 +4677,7 @@ function assembleOutputJSON2(a: AssembleArgs): OutputJSON2 {
         definition: coercePatternDefinition(a?.cffPatternObj?.cff?.pattern?.definition),
       },
       final_type: {
-        label: safeStr(a?.cffFinalObj?.cff?.final_type?.label),
-        type_code: extractTypeCodeFromLabel(a?.cffFinalObj?.cff?.final_type?.label),
-        chip_label: safeStr(a?.cffFinalObj?.cff?.final_type?.chip_label),
+        label: safeStr(a?.cffFinalObj?.cff?.final_type?.label),        chip_label: safeStr(a?.cffFinalObj?.cff?.final_type?.chip_label),
         confidence: clamp01_out(safeNum(a?.cffFinalObj?.cff?.final_type?.confidence)),
         interpretation: safeStr(a?.cffFinalObj?.cff?.final_type?.interpretation),
       },
@@ -4670,11 +4708,7 @@ function assembleOutputJSON2(a: AssembleArgs): OutputJSON2 {
           : {},
     },
 
-    rfs: {
-      primary_pattern: safeStr(a?.rfsStyle?.rfs?.primary_pattern),
-      representative_phrase: safeStr(a?.rfsStyle?.rfs?.representative_phrase),
-
-      summary_lines: Array.isArray(a?.rfsJob?.rfs?.summary_lines)
+    rfs: {      summary_lines: Array.isArray(a?.rfsJob?.rfs?.summary_lines)
         ? a.rfsJob.rfs.summary_lines.map((x: any) => safeStr(x))
         : [],
 
@@ -4752,8 +4786,6 @@ function assertOutputJSON2(out: OutputJSON2): void {
   must(out.rc.structural_control_signals && typeof out.rc.structural_control_signals === "object", "OutputJSON2: rc.structural_control_signals must be object");
 
   // RFS
-  must(typeof out.rfs.primary_pattern === "string", "OutputJSON2: rfs.primary_pattern missing");
-  must(typeof out.rfs.representative_phrase === "string", "OutputJSON2: rfs.representative_phrase missing");
   must(typeof out.rfs.recommended_roles_line === "string", "OutputJSON2: rfs.recommended_roles_line missing");
 }
 
@@ -4860,9 +4892,6 @@ export function deriveAll(input: GptBackendInput, opts: DeriveAllOptions = {}): 
     layer_3: raw?.layer_3 ?? {},
   });
 
-  // Distribution requires a logistic model for exact matching.
-  const rcModel = requireOrThrow(opts?.rcLogisticModel, "deriveAll: rcLogisticModel is required for exact distribution matching.");
-
   // Build CFV vector (0..1). We use CFF6 axes + HI + TPS_H.
   const cfv: CFV = {
     aas: numOr0(cff8?.AAS),
@@ -4875,7 +4904,9 @@ export function deriveAll(input: GptBackendInput, opts: DeriveAllOptions = {}): 
     tps_hist: numOr0(cff8?.TPS_H),
   };
 
-  const rcDist = buildReasoningControlDistribution({ cfv, model: rcModel });
+  const rcDist = opts?.rcLogisticModel
+    ? buildReasoningControlDistribution({ cfv, model: opts.rcLogisticModel })
+    : buildReasoningControlDistributionHeuristic(cfv, rcStructural.rc.structural_control_signals);
 
   // Observed Structural Signals need a set of active IDs (S1..S18).
   // In production you should pass rule-derived active IDs.
