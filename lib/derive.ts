@@ -1877,7 +1877,9 @@ export type CffInput = { indicators: Record<IndicatorCode, IndicatorValue | unde
 ========================= */
 
 export type CffFinalTypePublic = {
-  label: string;  chip_label: string;
+  label: string;
+  type_code: string;
+  chip_label: string;
   confidence: number; // 0..1
   interpretation: string;
 };
@@ -2222,7 +2224,9 @@ export function computeFinalDeterminationCff(
   return {
     cff: {
       final_type: {
-        label,        chip_label: chipLabel,
+        label,
+        type_code: finalCode,
+        chip_label: chipLabel,
         confidence,
         interpretation,
       },
@@ -4552,7 +4556,9 @@ export type OutputJSON2 = {
       definition: { primary: string; secondary: string };
     };
     final_type: {
-      label: string;      chip_label: string;
+      label: string;
+      type_code: string;
+      chip_label: string;
       confidence: number; // 0..1
       interpretation: string;
     };
