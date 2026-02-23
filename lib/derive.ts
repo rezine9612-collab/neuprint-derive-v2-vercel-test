@@ -4677,7 +4677,8 @@ function assembleOutputJSON2(a: AssembleArgs): OutputJSON2 {
         definition: coercePatternDefinition(a?.cffPatternObj?.cff?.pattern?.definition),
       },
       final_type: {
-        label: safeStr(a?.cffFinalObj?.cff?.final_type?.label),        chip_label: safeStr(a?.cffFinalObj?.cff?.final_type?.chip_label),
+        label: safeStr(a?.cffFinalObj?.cff?.final_type?.label),
+        type_code: safeStr((a?.cffFinalObj?.cff?.final_type as any)?.type_code) || (()=>{ const lbl=safeStr(a?.cffFinalObj?.cff?.final_type?.label); const m=lbl.match(/\b([A-Za-z]{1,3}\d*(?:-[0-9]+)?)\b/); return m?.[1] ?? ""; })(),        chip_label: safeStr(a?.cffFinalObj?.cff?.final_type?.chip_label),
         confidence: clamp01_out(safeNum(a?.cffFinalObj?.cff?.final_type?.confidence)),
         interpretation: safeStr(a?.cffFinalObj?.cff?.final_type?.interpretation),
       },
