@@ -601,6 +601,69 @@ export function getRSLLevelCuts() {
 
 
 /* ===== Backend_3_Cohort.ts ===== */
+/* Fix cohort curve (no cohortFriList available) */
+type CohortCurvePoint = { x: number; y: number };
+
+const DEFAULT_COHORT_CURVE: CohortCurvePoint[] = [
+  { x: 0.0, y: 2 },
+  { x: 0.5, y: 6 },
+  { x: 1.0, y: 14 },
+  { x: 1.5, y: 26 },
+  { x: 2.0, y: 30 },
+  { x: 2.5, y: 45 },
+  { x: 3.0, y: 58 },
+  { x: 3.5, y: 42 },
+  { x: 4.0, y: 22 },
+  { x: 4.5, y: 10 },
+  { x: 5.0, y: 4 },
+];
+
+function percentile0to1FromCurve(friValue: number, curve: CohortCurvePoint[]): number {
+  const pts = Array.isArray(curve) ? curve.filter(p => Number.isFinite(p?.x) && Number.isFinite(p?.y)) : [];
+  if (pts.length < 2) return 0.5;
+
+  // Ensure sorted by x
+  pts.sort((a, b) => a.x - b.x);
+
+  const v = Number.isFinite(friValue) ? friValue : 0;
+
+  // Trapezoidal integration of y over x as a pseudo-PDF
+  let totalArea = 0;
+  let belowArea = 0;
+
+  for (let i = 1; i < pts.length; i++) {
+    const x0 = pts[i - 1].x;
+    const x1 = pts[i].x;
+    const y0 = Math.max(0, pts[i - 1].y);
+    const y1 = Math.max(0, pts[i].y);
+
+    const dx = x1 - x0;
+    if (!(dx > 0)) continue;
+
+    const segArea = (y0 + y1) * 0.5 * dx;
+    totalArea += segArea;
+
+    if (v <= x0) {
+      // none of this segment is below v
+      continue;
+    } else if (v >= x1) {
+      // full segment is below v
+      belowArea += segArea;
+    } else {
+      // partial segment: linear interpolation at v
+      const t = (v - x0) / dx;
+      const yv = y0 + (y1 - y0) * t;
+      const partialArea = (y0 + yv) * 0.5 * (v - x0);
+      belowArea += partialArea;
+    }
+  }
+
+  if (!(totalArea > 0)) return 0.5;
+  const p = belowArea / totalArea;
+  return round4(Math.min(1, Math.max(0, p)));
+}
+
+
 
 function round4(x: number): number {
   return Math.round(x * 1000) / 1000;
@@ -610,7 +673,7 @@ export function percentile0to1(
   friValue: number,
   cohortFriList: number[]
 ): number {
-  if (!Array.isArray(cohortFriList) || cohortFriList.length === 0) return 0.5;
+  if (!Array.isArray(cohortFriList) || cohortFriList.length === 0) return percentile0to1FromCurve(friValue, DEFAULT_COHORT_CURVE);
 
   const v = Number.isFinite(friValue) ? friValue : 0;
   let lower = 0;
@@ -4501,11 +4564,43 @@ function strArrOrU(x: any): string[] | undefined {
 
 function pickRawFeaturesV1(input: any): RawFeaturesV1 {
   const rf = input?.raw_features ?? input ?? {};
+
+  // evidence_types can appear as:
+  // - array of strings (legacy)
+  // - object map { example: 3, data: 0, ... } (current fixture)
+  const evArrFromMap = (() => {
+    const m = rf?.evidence_types;
+    if (!m || typeof m !== "object" || Array.isArray(m)) return undefined;
+    const out: string[] = [];
+    for (const k of Object.keys(m)) {
+      const v = Number((m as any)[k]);
+      if (Number.isFinite(v) && v > 0) out.push(String(k));
+    }
+    return out.length ? out : undefined;
+  })();
+
+  const evArrFromLayer2 = strArrOrU(rf?.layer_2?.evidence_types);
+  const evidence_types = (evArrFromLayer2 && evArrFromLayer2.length ? evArrFromLayer2 : evArrFromMap);
+
+  // Evidence count: prefer explicit layer_0.evidence, but if missing/0 and evidence_types map has counts, use that sum.
+  const evidenceFromLayer0 = numOr0(rf?.layer_0?.evidence);
+  const evidenceFromMap = (() => {
+    const m = rf?.evidence_types;
+    if (!m || typeof m !== "object" || Array.isArray(m)) return 0;
+    let s = 0;
+    for (const k of Object.keys(m)) {
+      const v = Number((m as any)[k]);
+      if (Number.isFinite(v) && v > 0) s += v;
+    }
+    return s;
+  })();
+  const evidence = evidenceFromLayer0 > 0 ? evidenceFromLayer0 : evidenceFromMap;
+
   return {
     units: numOr0(rf?.layer_0?.units),
     claims: numOr0(rf?.layer_0?.claims),
     reasons: numOr0(rf?.layer_0?.reasons),
-    evidence: numOr0(rf?.layer_0?.evidence),
+    evidence: evidence,
 
     sub_claims: rf?.layer_1?.sub_claims == null ? undefined : numOr0(rf?.layer_1?.sub_claims),
     warrants: numOr0(rf?.layer_1?.warrants),
@@ -4514,7 +4609,7 @@ function pickRawFeaturesV1(input: any): RawFeaturesV1 {
     transitions: numOr0(rf?.layer_2?.transitions),
     transition_ok: numOr0(rf?.layer_2?.transition_ok),
     belief_change: boolOrU(rf?.layer_2?.belief_change),
-    evidence_types: strArrOrU(rf?.layer_2?.evidence_types),
+    evidence_types: evidence_types,
     adjacency_links: rf?.layer_2?.adjacency_links == null ? undefined : numOr0(rf?.layer_2?.adjacency_links),
 
     revisions: numOr0(rf?.layer_2?.revisions),
@@ -4528,6 +4623,7 @@ function pickRawFeaturesV1(input: any): RawFeaturesV1 {
     kpf_sim: rf?.backend_reserved?.kpf_sim ?? null,
     tps_h: rf?.backend_reserved?.tps_h ?? null,
   };
+}
 }
 
 function requireOrThrow<T>(v: T | undefined | null, msg: string): T {
