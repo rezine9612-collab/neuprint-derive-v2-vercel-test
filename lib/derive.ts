@@ -4624,7 +4624,6 @@ function pickRawFeaturesV1(input: any): RawFeaturesV1 {
     tps_h: rf?.backend_reserved?.tps_h ?? null,
   };
 }
-}
 
 function requireOrThrow<T>(v: T | undefined | null, msg: string): T {
   if (v == null) throw new Error(msg);
