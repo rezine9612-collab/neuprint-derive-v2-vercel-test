@@ -1,140 +1,115 @@
 {
-  "raw_features": {
-    "layer_0": {
-      "units": 6,
-      "unit_lengths": [
-        119,
-        67,
-        355,
-        73,
-        262,
-        508
-      ],
-      "per_unit": {
-        "transitions": [
-          1,
-          1,
-          1,
-          1,
-          1,
-          0
-        ],
-        "revisions": [
-          0,
-          0,
-          0,
-          0,
-          0,
-          0
-        ]
-      },
-      "claims": 7,
-      "reasons": 3,
-      "evidence": 0
-    },
-    "layer_1": {
-      "sub_claims": 3,
-      "warrants": 3,
-      "counterpoints": 0,
-      "refutations": 0,
-      "structure_type": null
-    },
-    "layer_2": {
-      "transitions": 5,
-      "transition_types": [],
-      "transition_ok": 5,
-      "revisions": 0,
-      "revision_depth_sum": 0.0,
-      "belief_change": false
-    },
-    "layer_3": {
-      "intent_markers": 0,
-      "drift_segments": 0,
-      "hedges": 12,
-      "loops": 0,
-      "self_regulation_signals": 0
-    },
-    "evidence_types": {
-      "example": 3,
-      "data": 0,
-      "authority": 0,
-      "analogy": 0,
-      "counterexample": 0,
-      "experience": 0,
-      "theory": 0
-    },
-    "adjacency_links": 3,
-    "backend_reserved": {
-      "kpf_sim": null,
-      "tps_h": null
-    }
-  },
-  "rsl_rubric": {
-    "coherence": 5,
-    "structure": 3,
-    "evaluation": 2,
-    "integration": 3
-  },
-  "rsl": {
-    "summary": {
-      "one_line": "The response presents a three-factor validity critique using ordered factor claims and illustrative scenarios.",
-      "paragraph": "The reasoning moves from an overall claim about internal validity to three sequential threats, each paired with a brief scenario and a causal link to overestimation. The strongest feature is its stable ordering and repeated connector pattern that keeps the reader oriented across factors. A limitation is that support remains illustrative rather than grounded in external sources or explicit evaluation criteria, which narrows the defensibility of the critique. If expanded, the argument could strengthen decision value by stating what evidence would distinguish gum effects from history, maturation, and selection influences."
-    },
-    "dimensions": [
-      {
-        "code": "R1",
-        "label": "Interpretation",
-        "score_1to5": 4,
-        "observation": "The response interprets the task as an internal validity analysis and frames the main issue as potential misestimation of results. It specifies a bounded set of three factors that will structure the reasoning path. A next step would be to clarify the experimental setting assumptions that make these factors most likely to operate."
-      },
-      {
-        "code": "R2",
-        "label": "Issue Decomposition",
-        "score_1to5": 3,
-        "observation": "The reasoning decomposes the critique into three distinct threats and treats each as a separate sub-claim. Each sub-claim is linked to a similar causal pattern explaining how the observed outcome could shift. Going forward, the analysis could map how these factors interact or compound across the same experimental timeline."
-      },
-      {
-        "code": "R3",
-        "label": "Evidence Quality",
-        "score_1to5": 2,
-        "observation": "Support is provided as hypothetical scenarios rather than external data, citations, or documented findings. The examples illustrate plausibility but do not function as verifiable evidence that changes the inference strength. To improve, the response could indicate what measurable indicators or records would validate each threat."
-      },
-      {
-        "code": "R4",
-        "label": "Reasoning & Counterfactuals",
-        "score_1to5": 3,
-        "observation": "The response uses causal reasoning to argue that observed smoking reductions could arise from factors other than the gum. It repeatedly contrasts an alternative cause against the focal treatment effect, shaping a consistent inference. A useful extension would be to specify concrete counterfactual checks, such as comparing trends in a matched control group."
-      },
-      {
-        "code": "R5",
-        "label": "Coherence & Clarity",
-        "score_1to5": 4,
-        "observation": "Connectors and repeated phrasing maintain a clear line across the three-factor structure. Each factor follows a consistent pattern of claim, example, and consequence statement that supports readability. Next, the clarity could be strengthened by tightening redundancy and making the causal language more precise where it repeats."
-      },
-      {
-        "code": "R6",
-        "label": "Metacognition & Self-repair",
-        "score_1to5": 0,
-        "observation": "There is no explicit self-monitoring language that revises or corrects earlier statements within the response. The argument progresses linearly without reflecting on uncertainty sources beyond modal phrasing. A forward-looking improvement would be to add a brief check on which factor is most plausible under specified experimental conditions."
-      },
-      {
-        "code": "R7",
-        "label": "Ethical / Societal Framing",
-        "score_1to5": 0,
-        "observation": "The response focuses on methodological validity and does not introduce ethical considerations or societal implications. Values do not appear to constrain the conclusion or shape trade-offs in the reasoning. If desired, the analysis could extend by noting implications for how cessation interventions should be evaluated responsibly in older populations."
-      },
-      {
-        "code": "R8",
-        "label": "Perspective Flexibility",
-        "score_1to5": 1,
-        "observation": "Alternative causes are listed across factors, but the response stays within a single analytic perspective of validity threats. It does not compare stakeholder viewpoints or shift interpretive frames to alter the reasoning direction. A next step could be to contrast how a researcher, clinician, and participant might differently interpret the same outcome shift."
-      }
-    ]
-  },
-  "raw_signals_quotes": {
-    "A7_value_aware_quote_candidates": [],
-    "A8_perspective_flexible_quote_candidates": [],
-    "self_repair_quote_candidates": [],
-    "framework_generation_quote_candidates": []
-  }
+"layer_0": {
+"units": 6,
+"unit_lengths": [279, 156, 154, 279, 291, 518],
+"per_unit": {
+"transitions": [0, 0, 0, 0, 0, 0],
+"revisions": [0, 0, 0, 0, 0, 0]
+},
+"claims": 6,
+"reasons": 2,
+"evidence": 0
+},
+"layer_1": {
+"sub_claims": 2,
+"warrants": 1,
+"counterpoints": 0,
+"refutations": 0,
+"structure_type": null
+},
+"layer_2": {
+"transitions": 5,
+"transition_types": [],
+"transition_ok": 5,
+"revisions": 0,
+"revision_depth_sum": 0.0,
+"belief_change": false
+},
+"layer_3": {
+"intent_markers": 2,
+"drift_segments": 0,
+"hedges": 0,
+"loops": 0,
+"self_regulation_signals": 0
+},
+"evidence_types": [],
+"adjacency_links": 1,
+"backend_reserved": {
+"kpf_sim": null,
+"tps_h": null
+},
+"rsl_rubric": {
+"coherence": 4,
+"structure": 3,
+"evaluation": 2,
+"integration": 3
+},
+"rsl": {
+"summary": {
+"one_line": "The reasoning contrasts human and machine strengths and argues for education that develops uniquely human capabilities.",
+"paragraph": "The text starts from observable task replacement by machines and shifts to a coexistence framing where roles are differentiated. It develops a through-line that positions flexibility and creativity as the human edge, then pivots to learning principles over memorization as a practical response. The reasoning is clear and sequential, but it relies more on conceptual explanation than verifiable external support. Further development could strengthen the argument by specifying testable criteria or concrete evidence that links educational change to long-term outcomes."
+},
+"dimensions": [
+{
+"code": "R1",
+"label": "Interpretation",
+"score_1to5": 4,
+"observation": "The reasoning reframes technological change as a coexistence problem rather than a simple replacement story. It emphasizes what humans should cultivate and what machines should be entrusted with, which clarifies purpose and direction. With further elaboration, the framing could be extended into more explicit constraints that guide real policy or curriculum decisions."
+},
+{
+"code": "R2",
+"label": "Issue Decomposition",
+"score_1to5": 3,
+"observation": "The text separates the problem into roles for machines, roles for humans, and an educational pathway that supports those roles. It links these pieces in a mostly linear chain, with each step feeding the next. A next step would be to break the education claim into sub-conditions that specify what must change first and why."
+},
+{
+"code": "R3",
+"label": "Evidence Quality",
+"score_1to5": 2,
+"observation": "The reasoning uses illustrative statements about kiosks and bank tellers as support, but it does not provide external data or cited sources. The argument primarily advances through explanation rather than verification, so evidence does not strongly constrain conclusions. It could be strengthened by adding credible sources or measurable indicators that would confirm the described trends and effects."
+},
+{
+"code": "R4",
+"label": "Reasoning & Counterfactuals",
+"score_1to5": 2,
+"observation": "The text relies on comparison and directional claims, such as prioritizing understanding over memorization and coexistence over competition. It does not explore counterfactual paths or trade-offs that would change the reasoning trajectory. A useful extension would be to test alternative scenarios, such as when memorization remains valuable, and show how conclusions would adjust."
+},
+{
+"code": "R5",
+"label": "Coherence & Clarity",
+"score_1to5": 4,
+"observation": "The reasoning is easy to follow because it uses explicit connectors and clear progression from problem to response. Key transitions are signposted and the argument maintains a consistent thematic focus on human uniqueness and education. Going forward, clarity could be further enhanced by tightening definitions of key terms so readers interpret them consistently."
+},
+{
+"code": "R6",
+"label": "Metacognition & Self-repair",
+"score_1to5": 0,
+"observation": "There is no explicit self-monitoring language that revises or corrects earlier reasoning. The argument proceeds without signaling reconsideration, uncertainty adjustment, or deliberate repair of a prior claim. A forward-looking extension would be to add explicit checks on assumptions, indicating what would need to be true for the claims to hold."
+},
+{
+"code": "R7",
+"label": "Ethical / Societal Framing",
+"score_1to5": 2,
+"observation": "The text includes a value-oriented element through the idea of wise reflection guided by conscience. This framing suggests an ethical orientation, but it does not deeply weigh competing values or show how values constrain the conclusion. It could be extended by clarifying which societal outcomes are prioritized and how those priorities shape the recommended educational shift."
+},
+{
+"code": "R8",
+"label": "Perspective Flexibility",
+"score_1to5": 3,
+"observation": "The reasoning considers both machine strengths and human strengths and proposes a division of roles between them. It contrasts competition with coexistence and uses that contrast to redirect the argument toward capability development. A natural extension would be to compare additional stakeholder perspectives, such as workers, educators, and employers, and show how the recommendation adapts."
+}
+]
+},
+"raw_signals_quotes": {
+"A7_value_aware_quote_candidates": [
+"Wise reflection, guided by conscience, allows us to flexibly overcome the various limitations we will face in the future."
+],
+"A8_perspective_flexible_quote_candidates": [
+"Explanation (C) emphasizes that in the age of artificial intelligence, we must seek ways for humans and machines to coexist and thrive, rather than compete."
+],
+"self_repair_quote_candidates": [],
+"framework_generation_quote_candidates": [
+"In other words, to prepare for the age of artificial intelligence, we must move away from rote learning as quickly as possible and embrace an education that fosters flexibility and creativity."
+]
+}
 }
