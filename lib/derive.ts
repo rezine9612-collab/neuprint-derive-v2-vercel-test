@@ -4941,8 +4941,7 @@ export function deriveAll(input: GptBackendInput, opts: DeriveAllOptions = {}): 
     raw_signals_quotes: (g?.raw_signals_quotes ?? raw?.raw_signals_quotes ?? null),
   });
 
-  const cohortList = opts?.cohortFriList;
-  const rslCohortObj = computeRslCohortResponse(friScore, Array.isArray(cohortList) ? cohortList : []);
+  const rslCohortObj = computeRslCohortResponse(friScore, []);
   const rslSriObj = deriveRslSriFromRaw(raw ?? {});
 
   // ---------------------------------------------------------
