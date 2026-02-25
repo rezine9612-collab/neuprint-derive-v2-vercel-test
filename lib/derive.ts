@@ -4905,6 +4905,1059 @@ function clamp0to100_out(x: number): number {
 }
 
 
+
+
+/* =========================================================
+   Backend_B_Extraction (inlined single-file)
+   - Deterministic segmentation + unit_lengths + lexical counts
+   - Does NOT compute RSL levels / FRI / gates / signal states
+========================================================= */
+
+/* ===== BEGIN segmentation_rules.ts (inlined) ===== */
+// segmentation_rules.ts
+// NeuPrint Backend Deterministic Segmentation Rules (FULL RULE SET, B)
+// Goal: single source of truth for all locked lexical lists and regex builders.
+// Notes:
+// - Do NOT normalize punctuation or spacing.
+// - Do NOT trim internal spaces.
+// - Use case-insensitive matching by default.
+// - Keep lists stable to preserve numeric reproducibility.
+
+type EvidenceType =
+  | "example"
+  | "data"
+  | "authority"
+  | "analogy"
+  | "counterexample"
+  | "experience"
+  | "theory";
+
+// Fixed output order (LOCKED)
+const FIXED_EVIDENCE_ORDER: EvidenceType[] = [
+  "example",
+  "data",
+  "authority",
+  "analogy",
+  "counterexample",
+  "experience",
+  "theory",
+];
+
+// ------------------------------
+// Factor Indicators (LOCKED)
+// ------------------------------
+// These are treated as structural markers used for factor lock segmentation.
+// They can appear at sentence start or early in the sentence.
+// Keep list stable and conservative. Prefer fewer units when uncertain.
+const FACTOR_INDICATORS: string[] = [
+  "first",
+  "firstly",
+  "second",
+  "secondly",
+  "third",
+  "thirdly",
+  "fourth",
+  "fourthly",
+  "finally",
+  "in conclusion",
+  "to conclude",
+  "overall",
+  "one reason",
+  "another reason",
+  "a key factor",
+  "the first factor",
+  "the second factor",
+  "the third factor",
+  "the key factor",
+];
+
+// Numbered logical progression markers (stronger structural lock)
+const ORDERED_PROGRESSIONS: string[] = [
+  "first",
+  "second",
+  "third",
+  "finally",
+  "in conclusion",
+];
+
+// ------------------------------
+// Merge Rules (LOCKED)
+// ------------------------------
+// Sentences starting with these connectors MUST remain inside the same unit
+// as the preceding factor sentence.
+const EXAMPLE_MERGE_LEADERS: string[] = [
+  "for example",
+  "in this case",
+  "therefore",
+  "thus",
+  "because",
+  "as a result",
+  "which means",
+];
+
+// Parenthesis rule is handled in segmenter.ts, but we keep a detector here.
+const PARENTHESIS_OPENERS: string[] = ["(", "[", "{"];
+
+// ------------------------------
+// Counting Rules (LOCKED)
+// ------------------------------
+// Reasons counted ONLY when explicit justification connector is present.
+const REASON_CONNECTORS: string[] = [
+  "because",
+  "since",
+  "therefore",
+  "thus",
+  "so that",
+  "as a result",
+  "which means",
+];
+
+// Adjacency links counted ONLY when explicit logical connectors exist.
+const ADJACENCY_CONNECTORS: string[] = [
+  "because",
+  "therefore",
+  "thus",
+  "since",
+  "so that",
+  "hence",
+  "consequently",
+  "as a result",
+  "which means",
+];
+
+// Hedge count stability: only explicit hedge words.
+const HEDGE_WORDS: string[] = [
+  "may",
+  "might",
+  "could",
+  "possibly",
+  "likely",
+  "suggest",
+];
+
+// Revision markers: shallow revision (depth=0.2) if present and changes framing.
+// The "not X but Y" and "no longer X, instead Y" are handled as regex patterns.
+const REFRAME_MARKERS: string[] = [
+  "rather than",
+  "instead of",
+  "more important than",
+  "less important than",
+  "move away from",
+  "shift from",
+];
+
+// Explicit correction markers for deeper revisions. Depth rules are applied elsewhere.
+const CORRECTION_MARKERS: string[] = [
+  "however i revise",
+  "on reconsideration",
+  "i change",
+  "correction",
+  "reconsideration",
+  "withdraw",
+  "replace",
+];
+
+// ------------------------------
+// Evidence Type Detectors (Conservative)
+// ------------------------------
+const EVIDENCE_TYPE_HINTS = {
+  example: ["for example", "in this case"],
+  data: ["data", "statistics", "percent", "%"],
+  authority: ["according to", "research", "study", "report", "expert", "explanation ("],
+  analogy: ["as if"], // keep conservative, "like" is ambiguous and can explode false positives
+  counterexample: ["counterexample"],
+  experience: ["experienced"], // keep conservative to avoid false positives
+  theory: ["principle", "theory", "framework"],
+} as const;
+
+// ------------------------------
+// Regex Builders (Deterministic)
+// ------------------------------
+
+// Escape for safe regex construction.
+function escapeRegexLiteral(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Phrase regex with word boundaries on both ends.
+// Good for single words or multi-word phrases where boundary checks are helpful.
+function phraseBoundaryRegex(phrase: string): RegExp {
+  const p = escapeRegexLiteral(phrase);
+  // For multi-word phrases, \b at ends still helps without forcing internal boundaries.
+  return new RegExp(`\\b${p}\\b`, "i");
+}
+
+// Start-of-sentence style detector (conservative).
+// Accepts optional leading quotes or parentheses, then the marker.
+function sentenceLeadRegex(leadPhrase: string): RegExp {
+  const p = escapeRegexLiteral(leadPhrase);
+  return new RegExp(`^\\s*[\"'\\(\\[]?\\s*${p}\\b`, "i");
+}
+
+// Detect numbered list items at line starts.
+// Examples:
+// "1. ..." "2) ..." "3 - ..." "4: ..."
+// This supports the rule: If a numbered list exists, each number SHOULD correspond to one unit.
+const NUMBERED_LINE_START_REGEX: RegExp =
+  /^\s*(\d{1,3})\s*([.)]|:|-)\s+/m;
+
+// Detect ordinal words at line start (First, Second, Third, Finally, etc.).
+const ORDINAL_LINE_START_REGEX: RegExp =
+  /^\s*(first|firstly|second|secondly|third|thirdly|fourth|fourthly|finally)\b/im;
+
+// Detect common page marker line like "- 1 -" that should NOT be treated as a unit boundary.
+// This is defensive for source texts that include pagination artifacts.
+const PAGE_MARKER_LINE_REGEX: RegExp =
+  /^\s*-\s*\d{1,4}\s*-\s*$/m;
+
+// Detect "not X but Y" reframing pattern (shallow revision candidate).
+// Keep conservative by limiting span length.
+const NOT_X_BUT_Y_REGEX: RegExp =
+  /\bnot\b[\s\S]{1,80}\bbut\b/i;
+
+// Detect "no longer X, instead Y" reframing pattern (shallow revision candidate).
+const NO_LONGER_INSTEAD_REGEX: RegExp =
+  /\bno longer\b[\s\S]{1,80}\binstead\b/i;
+
+// Detect any of the merge leaders at sentence start.
+function isExampleMergeLeaderSentence(sentence: string): boolean {
+  const s = sentence || "";
+  for (const lead of EXAMPLE_MERGE_LEADERS) {
+    if (sentenceLeadRegex(lead).test(s)) return true;
+  }
+  return false;
+}
+
+// Detect factor indicator at sentence start.
+function isFactorLeadSentence(sentence: string): boolean {
+  const s = sentence || "";
+  // Strong ordinal detection
+  if (ORDINAL_LINE_START_REGEX.test(s)) return true;
+  // Also allow configured phrases
+  for (const ind of FACTOR_INDICATORS) {
+    if (sentenceLeadRegex(ind).test(s)) return true;
+  }
+  return false;
+}
+
+// Detect whether the full text contains any numbered list structure.
+function hasNumberedListStructure(fullText: string): boolean {
+  if (!fullText) return false;
+  // Ignore pure page marker lines
+  const cleaned = fullText.replace(PAGE_MARKER_LINE_REGEX, "");
+  return NUMBERED_LINE_START_REGEX.test(cleaned);
+}
+
+// Deterministic edge trim: leading/trailing whitespace only.
+function trimEdgesOnly(s: string): string {
+  return (s || "").replace(/^\s+/, "").replace(/\s+$/, "");
+}
+/* ===== END segmentation_rules.ts (inlined) ===== */
+
+/* ===== BEGIN segmenter.fixed.ts (inlined) ===== */
+// segmenter.ts
+// NeuPrint Backend Deterministic Segmenter (FULL RULE SET, B)
+//
+// Input:  raw text (string)
+// Output: unit_texts (string[]) where each unit is a semantic reasoning segment
+//         determined by deterministic structural rules.
+//
+// Deterministic Priority Order (LOCKED):
+// 1) Structural locks (factor / numbering)
+// 2) Merge rules (example / parenthesis)
+// 3) Boundary rules (intro / conclusion)
+// 4) Minimum unit variance (choose fewer units when multiple options possible)
+//
+// Notes:
+// - Do NOT normalize punctuation, spacing, or capitalization.
+// - Line breaks count as one character downstream; preserve raw line breaks.
+// - Prefer fewer units when uncertain.
+// - If both numbered list rule and factor lock rule apply, factor lock takes precedence.
+
+type SegmentationResult = {
+  unit_texts: string[];
+};
+
+type Sentence = {
+  text: string;     // sentence string, preserved as in source slice
+  start: number;    // start index in original full text
+  end: number;      // end index (exclusive) in original full text
+};
+
+// ------------------------------
+// Public API
+// ------------------------------
+function segmentText(fullTextRaw: string): SegmentationResult {
+  const fullText = fullTextRaw ?? "";
+  const cleaned = stripPurePageMarkerLines(fullText);
+
+  // 0) Tokenize into candidate sentences (conservative).
+  const sentences = splitIntoSentencesConservative(cleaned);
+
+  // If empty or no meaningful content:
+  if (sentences.length === 0) {
+    const t = trimEdgesOnly(cleaned);
+    return { unit_texts: t ? [t] : [] };
+  }
+
+  // 1) Build base units by structural locks (factor OR numbered list).
+  // Factor lock has precedence over numbered list if both apply.
+  const baseUnits = buildUnitsByStructuralLocks(cleaned, sentences);
+
+  // 2) Apply merge rules (example merge leaders + parenthesis containment)
+  const mergedUnits = mergeUnitsByRules(cleaned, baseUnits);
+
+  // 3) Apply intro/conclusion boundary rules (only if it reduces instability).
+  const withIntroConclusion = applyIntroConclusionRules(mergedUnits);
+
+  // 4) Minimum unit variance rule: choose fewer units when ambiguous.
+  // At this stage we avoid splitting further; only consolidate if needed.
+  const finalUnits = minimizeUnitVariance(withIntroConclusion);
+
+  // Final trim edges only (leading/trailing whitespace removed)
+  const out = finalUnits
+    .map((u) => trimEdgesOnly(u))
+    .filter((u) => u.length > 0);
+
+  return { unit_texts: out };
+}
+
+// ------------------------------
+// Step 1: Structural Locks
+// ------------------------------
+
+function buildUnitsByStructuralLocks(fullText: string, sentences: Sentence[]): string[] {
+  // Detect presence of numbered list structure
+  const hasNumbered = hasNumberedListStructure(fullText);
+
+  // Determine if factor locks are present
+  const hasFactor = sentences.some((s) => isFactorLeadSentence(s.text));
+
+  // Precedence: factor lock over numbered list
+  if (hasFactor) return buildUnitsByFactorLocks(fullText, sentences);
+
+  if (hasNumbered) return buildUnitsByNumberedLines(fullText);
+
+  // Fallback: no strong structural locks, use conservative paragraph grouping
+  return buildUnitsByParagraphBlocks(fullText);
+}
+
+function buildUnitsByFactorLocks(fullText: string, sentences: Sentence[]): string[] {
+  // Factor block rule:
+  // Each factor block = 1 unit, includes:
+  // - factor claim sentence
+  // - immediately following example sentences / parentheticals / consequence/explanation
+  //
+  // We implement this by:
+  // - finding indices where sentence is factor lead
+  // - creating blocks from each factor lead to just before next factor lead (or end)
+  // - introduction and conclusion handled later
+
+  const factorStarts: number[] = [];
+  for (let i = 0; i < sentences.length; i++) {
+    if (isFactorLeadSentence(sentences[i].text)) factorStarts.push(i);
+  }
+
+  // If factorStarts exists but first factorStart is 0 and text is tiny, still allow 1 block.
+  if (factorStarts.length === 0) {
+    return buildUnitsByParagraphBlocks(fullText);
+  }
+
+  const blocks: string[] = [];
+  for (let k = 0; k < factorStarts.length; k++) {
+    const startIdx = factorStarts[k];
+    const endIdxExclusive = (k + 1 < factorStarts.length) ? factorStarts[k + 1] : sentences.length;
+
+    const start = sentences[startIdx].start;
+    const end = sentences[endIdxExclusive - 1].end;
+
+    blocks.push(fullText.slice(start, end));
+  }
+
+  return blocks;
+}
+
+function buildUnitsByNumberedLines(fullText: string): string[] {
+  // Rule: If a numbered list exists, each number SHOULD correspond to one unit.
+  // Implementation:
+  // - split by numbered line starts (multiline)
+  // - keep the prefix number line within the unit
+  // - do not split if there are no matches
+
+  const matches = [...fullText.matchAll(NUMBERED_LINE_START_REGEX)];
+  if (matches.length === 0) {
+    return buildUnitsByParagraphBlocks(fullText);
+  }
+
+  // Determine start indices of each numbered item
+  const starts = matches.map((m) => m.index ?? 0);
+
+  // Build units between consecutive starts
+  const units: string[] = [];
+  for (let i = 0; i < starts.length; i++) {
+    const start = starts[i];
+    const end = (i + 1 < starts.length) ? starts[i + 1] : fullText.length;
+    units.push(fullText.slice(start, end));
+  }
+
+  return units;
+}
+
+function buildUnitsByParagraphBlocks(fullText: string): string[] {
+  // Conservative fallback:
+  // - split by blank lines
+  // - if still too large single block, keep as one to satisfy minimum variance rule
+  const paras = splitByBlankLines(fullText).map(trimEdgesOnly).filter((p) => p.length > 0);
+  if (paras.length === 0) {
+    const t = trimEdgesOnly(fullText);
+    return t ? [t] : [];
+  }
+  // Prefer fewer units: if many paras, still keep them as separate blocks (stable),
+  // but we will later minimize if needed.
+  return paras;
+}
+
+// ------------------------------
+// Step 2: Merge Rules
+// ------------------------------
+
+function mergeUnitsByRules(_fullText: string, baseUnits: string[]): string[] {
+  if (baseUnits.length <= 1) return baseUnits;
+
+  // Apply per-unit sentence-level merge for example leader + parentheses
+  // We do NOT split inside base units; we only ensure that internal sentence boundaries
+  // don't cause accidental future splits (defensive). In this segmenter, we never split
+  // further after structural locks. Still, we implement parenthesis containment by ensuring
+  // we don't cut units at positions that would break parentheses.
+  //
+  // For factor locks and numbered units, their boundaries come from structural markers.
+  // We can only adjust by merging adjacent units if boundary violates merge rules.
+
+  const units = [...baseUnits];
+
+  // 2.1 Parenthesis boundary protection:
+  // If a unit boundary occurs while parentheses are open, merge with next.
+  let i = 0;
+  while (i < units.length - 1) {
+    const left = units[i];
+    const right = units[i + 1];
+    if (boundarySplitsOpenParenthesis(left, right)) {
+      units[i] = left + right;
+      units.splice(i + 1, 1);
+      continue; // re-check same index after merge
+    }
+    i++;
+  }
+
+  // 2.2 Example merge leaders at boundary:
+  // If the first sentence of the RIGHT unit begins with an example merge leader,
+  // then it MUST remain inside the same unit as the preceding factor sentence.
+  // So we merge RIGHT into LEFT.
+  i = 0;
+  while (i < units.length - 1) {
+    const left = units[i];
+    const right = units[i + 1];
+
+    const rightFirstSentence = getFirstSentenceText(right);
+    if (rightFirstSentence && isExampleMergeLeaderSentence(rightFirstSentence)) {
+      units[i] = left + right;
+      units.splice(i + 1, 1);
+      continue;
+    }
+    i++;
+  }
+
+  return units;
+}
+
+// If the boundary occurs with open parenthesis on left that closes in right, merge.
+function boundarySplitsOpenParenthesis(left: string, right: string): boolean {
+  const leftTrim = left ?? "";
+  const rightTrim = right ?? "";
+  const leftBalance = parenthesisBalance(leftTrim);
+  if (leftBalance <= 0) return false;
+  // If left has more opens than closes, boundary likely splits.
+  // Merge if right provides any closing parenthesis.
+  const rightHasClose = /[)\]}]/.test(rightTrim);
+  return rightHasClose;
+}
+
+function parenthesisBalance(s: string): number {
+  let bal = 0;
+  for (const ch of s) {
+    if (ch === "(" || ch === "[" || ch === "{") bal++;
+    else if (ch === ")" || ch === "]" || ch === "}") bal--;
+  }
+  return bal;
+}
+
+// ------------------------------
+// Step 3: Intro / Conclusion Rules
+// ------------------------------
+
+function applyIntroConclusionRules(units: string[]): string[] {
+  // Intro rule:
+  // If an introductory sentence defines overall claim before factors,
+  // it SHOULD be its own unit unless extremely short (< 40 chars).
+  //
+  // Conclusion rule:
+  // If there's a closing synthesis after factors, it SHOULD be its own unit.
+  //
+  // Here, because structural locks already created blocks, we only attempt:
+  // - split a leading intro sentence out of first unit when safe AND stable
+  // - split trailing conclusion sentence out of last unit when safe AND stable
+  //
+  // Stability principle: Prefer fewer units when uncertain. So we split only when:
+  // - the extracted intro/conclusion is clearly separated by sentence boundary
+  // - extracted segment is not extremely short
+  // - and it does not violate parenthesis balance
+
+  if (units.length === 0) return units;
+
+  const out = [...units];
+
+  // Attempt intro split on first unit
+  out.splice(0, 1, ...splitIntroFromUnitIfSafe(out[0]));
+
+  // Attempt conclusion split on last unit
+  const lastIdx = out.length - 1;
+  const lastSplit = splitConclusionFromUnitIfSafe(out[lastIdx]);
+  out.splice(lastIdx, 1, ...lastSplit);
+
+  return out;
+}
+
+function splitIntroFromUnitIfSafe(unit: string): string[] {
+  const u = unit ?? "";
+  const sentences = splitIntoSentencesConservative(u);
+  if (sentences.length < 2) return [u];
+
+  const first = sentences[0].text;
+  // Intro should be own unit unless extremely short (<40 chars)
+  if (trimEdgesOnly(first).length < 40) return [u];
+
+  // Only split if first sentence is NOT a factor lead and next sentence IS a factor lead
+  const second = sentences[1].text;
+  if (isFactorLeadSentence(first)) return [u];
+  if (!isFactorLeadSentence(second)) return [u];
+
+  const introEnd = sentences[0].end;
+  const intro = u.slice(0, introEnd);
+  const rest = u.slice(introEnd);
+
+  if (parenthesisBalance(intro) !== 0) return [u];
+
+  // Prefer fewer units: split only when clearly safe
+  return [intro, rest];
+}
+
+function splitConclusionFromUnitIfSafe(unit: string): string[] {
+  const u = unit ?? "";
+  const sentences = splitIntoSentencesConservative(u);
+  if (sentences.length < 2) return [u];
+
+  const last = sentences[sentences.length - 1].text;
+  // If last sentence is a clear synthesis marker, consider splitting.
+  const lastLower = trimEdgesOnly(last).toLowerCase();
+
+  const isConclusionLead =
+    lastLower.startsWith("in conclusion") ||
+    lastLower.startsWith("to conclude") ||
+    lastLower.startsWith("overall");
+
+  if (!isConclusionLead) return [u];
+
+  // Split only if conclusion sentence not extremely short
+  if (trimEdgesOnly(last).length < 40) return [u];
+
+  const lastStart = sentences[sentences.length - 1].start;
+  const head = u.slice(0, lastStart);
+  const concl = u.slice(lastStart);
+
+  if (parenthesisBalance(head) !== 0) return [u];
+
+  return [head, concl];
+}
+
+// ------------------------------
+// Step 4: Minimum Unit Variance
+// ------------------------------
+
+function minimizeUnitVariance(units: string[]): string[] {
+  // Rule: If two segmentation options are possible, choose FEWER units.
+  // In this implementation we never create alternative trees; we only
+  // perform safe consolidations when small units are likely artifacts.
+
+  if (units.length <= 1) return units;
+
+  // If any unit is extremely short, merge it with neighbor to reduce variance.
+  // Conservative thresholds:
+  // - if unit trimmed length < 40 chars, merge into previous if possible, else next.
+  const out = [...units];
+  let i = 0;
+  while (i < out.length) {
+    const t = trimEdgesOnly(out[i]);
+    if (t.length > 0 && t.length < 40) {
+      if (i > 0) {
+        out[i - 1] = out[i - 1] + out[i];
+        out.splice(i, 1);
+        i = Math.max(0, i - 1);
+        continue;
+      } else if (out.length > 1) {
+        out[0] = out[0] + out[1];
+        out.splice(1, 1);
+        continue;
+      }
+    }
+    i++;
+  }
+  return out;
+}
+
+// ------------------------------
+// Helpers: Sentence Splitting (Conservative)
+// ------------------------------
+
+// Conservative sentence splitter:
+// - split on ., ?, ! when followed by whitespace/newline or end of string
+// - keep punctuation as part of sentence
+// - does not attempt to handle abbreviations (we prefer stability over perfect NLP)
+function splitIntoSentencesConservative(text: string): Sentence[] {
+  const s = text ?? "";
+  const out: Sentence[] = [];
+
+  let start = 0;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    const isEndPunct = ch === "." || ch === "?" || ch === "!";
+    if (!isEndPunct) continue;
+
+    const next = s[i + 1];
+    const boundary = (i + 1 === s.length) || next === " " || next === "\n" || next === "\r" || next === "\t";
+    if (!boundary) continue;
+
+    const end = i + 1;
+    const slice = s.slice(start, end);
+    out.push({ text: slice, start, end });
+
+    start = end;
+  }
+
+  // remainder
+  if (start < s.length) {
+    const slice = s.slice(start);
+    out.push({ text: slice, start, end: s.length });
+  }
+
+  // Remove empty sentences (but keep whitespace inside segments for indices)
+  return out
+    .map((x) => ({ ...x, text: x.text }))
+    .filter((x) => trimEdgesOnly(x.text).length > 0);
+}
+
+function getFirstSentenceText(unit: string): string {
+  const sentences = splitIntoSentencesConservative(unit ?? "");
+  return sentences.length ? sentences[0].text : "";
+}
+
+function splitByBlankLines(text: string): string[] {
+  // split on two or more line breaks with optional spaces
+  return (text ?? "").split(/\n\s*\n+/);
+}
+
+function stripPurePageMarkerLines(text: string): string {
+  // Remove lines that are only "- N -" (pagination artifacts)
+  return (text ?? "").replace(PAGE_MARKER_LINE_REGEX, "");
+}
+/* ===== END segmenter.fixed.ts (inlined) ===== */
+
+/* ===== BEGIN unit_lengths.ts (inlined) ===== */
+// unit_lengths.ts
+// NeuPrint Backend Deterministic unit_lengths (FULL RULE SET, B)
+//
+// Rule (LOCKED):
+// 1) Count all characters including spaces, punctuation, parentheses.
+// 2) Exclude leading whitespace and trailing whitespace only.
+// 3) Do NOT normalize punctuation, spacing, capitalization.
+// 4) Line breaks count as ONE character (native string length behavior).
+// 5) Do NOT trim internal spaces.
+//
+// Output:
+// - unit_lengths MUST be per-unit character counts (integers), not rounded.
+
+function computeUnitLengths(unit_texts: string[]): number[] {
+  const units = Array.isArray(unit_texts) ? unit_texts : [];
+  return units.map((u) => {
+    const t = trimEdgesOnly(u ?? "");
+    // JS/TS .length counts \n as 1 char, satisfying the lock.
+    return t.length;
+  });
+}
+/* ===== END unit_lengths.ts (inlined) ===== */
+
+/* ===== BEGIN deterministic_counts.fixed.ts (inlined) ===== */
+// deterministic_counts.ts
+// NeuPrint Backend Deterministic Counts (FULL RULE SET, B)
+//
+// Input:  unit_texts (string[]), assumed to be the final deterministic units
+// Output: deterministic numeric fields that are strictly lexical-marker based.
+//
+// IMPORTANT:
+// - Count ONLY explicit lexical markers for reasons/hedges/adjacency_links.
+// - Revisions: allow shallow reframing (depth=0.2) when fixed markers present.
+// - Count at most 1 revision event per unit unless two separate explicit corrections exist
+//   (we implement conservative: max 1 per unit).
+// - evidence_types: presence-only, fixed output order.
+//
+// This module does NOT compute claims/evidence/transitions/transition_ok/drift_segments,
+// because those may require semantic boundary exceptions or richer interpretation.
+// Those remain GPT-side (or later deterministic upgrades).
+
+type DeterministicCounts = {
+  // layer_0
+  reasons: number;
+
+  // layer_3
+  hedges: number;
+
+  // root
+  adjacency_links: number;
+  evidence_types: EvidenceType[];
+
+  // per-unit
+  per_unit_revisions: number[]; // 0/1 aligned to unit_texts length
+
+  // layer_2
+  revisions: number;
+  revision_depth_sum: number; // float allowed, stable rounding applied
+};
+
+function computeDeterministicCounts(unit_texts: string[]): DeterministicCounts {
+  const units = (Array.isArray(unit_texts) ? unit_texts : []).map((u) => trimEdgesOnly(u ?? ""));
+
+  const joined = units.join("\n");
+
+  const reasons = countConnectors(joined, REASON_CONNECTORS);
+  const hedges = countWords(joined, HEDGE_WORDS);
+  const adjacency_links = countConnectors(joined, ADJACENCY_CONNECTORS);
+
+  const { per_unit_revisions, revisions, revision_depth_sum } = computeRevisions(units);
+
+  const evidence_types = detectEvidenceTypes(units);
+
+  return {
+    reasons,
+    hedges,
+    adjacency_links,
+    evidence_types,
+    per_unit_revisions,
+    revisions,
+    revision_depth_sum,
+  };
+}
+
+// ------------------------------
+// Lexical Counting (Deterministic)
+// ------------------------------
+
+// Count connectors as phrases with word boundaries on both ends.
+// This counts explicit occurrences only, case-insensitive.
+function countConnectors(text: string, connectors: string[]): number {
+  const t = text ?? "";
+  let total = 0;
+  for (const c of connectors) {
+    total += countOccurrencesBoundary(t, c);
+  }
+  return total;
+}
+
+// Count explicit hedge words (word boundary).
+function countWords(text: string, words: string[]): number {
+  const t = text ?? "";
+  let total = 0;
+  for (const w of words) {
+    total += countOccurrencesBoundary(t, w);
+  }
+  return total;
+}
+
+function countOccurrencesBoundary(text: string, phrase: string): number {
+  if (!text || !phrase) return 0;
+  const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`\\b${escaped}\\b`, "gi");
+  const m = text.match(re);
+  return m ? m.length : 0;
+}
+
+// ------------------------------
+// Revisions (Deterministic, Conservative)
+// ------------------------------
+
+function computeRevisions(units: string[]): {
+  per_unit_revisions: number[];
+  revisions: number;
+  revision_depth_sum: number;
+} {
+  const per_unit_revisions: number[] = [];
+  let revisions = 0;
+  let depthSum = 0;
+
+  for (const u of units) {
+    const { has, depth } = detectSingleRevisionEvent(u);
+    const flag = has ? 1 : 0;
+    per_unit_revisions.push(flag);
+    if (has) {
+      revisions += 1;
+      depthSum += depth;
+    }
+  }
+
+  // Stable rounding: avoid float noise (0.2 steps)
+  const revision_depth_sum = stableRound1(depthSum);
+
+  return { per_unit_revisions, revisions, revision_depth_sum };
+}
+
+function detectSingleRevisionEvent(unit: string): { has: boolean; depth: number } {
+  const t = (unit ?? "").toLowerCase();
+
+  // 1) Explicit correction markers (depth >= 0.5)
+  for (const m of CORRECTION_MARKERS) {
+    if (t.includes(m)) {
+      return { has: true, depth: 0.5 };
+    }
+  }
+
+  // 2) Shallow reframing markers (depth = 0.2), max 1 per unit
+  for (const m of REFRAME_MARKERS) {
+    if (t.includes(m)) {
+      return { has: true, depth: 0.2 };
+    }
+  }
+
+  if (NOT_X_BUT_Y_REGEX.test(t)) {
+    return { has: true, depth: 0.2 };
+  }
+
+  if (NO_LONGER_INSTEAD_REGEX.test(t)) {
+    return { has: true, depth: 0.2 };
+  }
+
+  return { has: false, depth: 0.0 };
+}
+
+function stableRound1(x: number): number {
+  return Math.round((x + Number.EPSILON) * 10) / 10;
+}
+
+// ------------------------------
+// Evidence Types (Presence-only, Fixed Order)
+// ------------------------------
+
+function detectEvidenceTypes(units: string[]): EvidenceType[] {
+  const full = units.join("\n").toLowerCase();
+  const present = new Set<EvidenceType>();
+
+  // example
+  if (containsAny(full, EVIDENCE_TYPE_HINTS.example)) present.add("example");
+
+  // data (conservative): ONLY explicit cues (no numeric heuristics)
+  if (containsAny(full, EVIDENCE_TYPE_HINTS.data)) {
+    present.add("data");
+  }
+
+  // authority
+  if (containsAny(full, EVIDENCE_TYPE_HINTS.authority)) present.add("authority");
+
+  // analogy (conservative: only "as if" by default)
+  if (containsAny(full, EVIDENCE_TYPE_HINTS.analogy)) present.add("analogy");
+
+  // counterexample
+  if (containsAny(full, EVIDENCE_TYPE_HINTS.counterexample)) present.add("counterexample");
+
+  // experience (conservative: explicit "experienced")
+  if (containsAny(full, EVIDENCE_TYPE_HINTS.experience)) present.add("experience");
+
+  // theory
+  if (containsAny(full, EVIDENCE_TYPE_HINTS.theory)) present.add("theory");
+
+  // fixed order output
+  return FIXED_EVIDENCE_ORDER.filter((t) => present.has(t));
+}
+
+function containsAny(textLower: string, phrases: readonly string[]): boolean {
+  for (const p of phrases) {
+    if (textLower.includes(p)) return true;
+  }
+  return false;
+}
+/* ===== END deterministic_counts.fixed.ts (inlined) ===== */
+
+/* ===== BEGIN extraction_fill.fixed.ts (inlined) ===== */
+// extraction_fill.ts
+// NeuPrint Backend Extraction Filler (FULL RULE SET, B)
+//
+// Purpose:
+// - Take GPT-produced extraction JSON (schema-locked) and raw input text,
+// - Compute deterministic backend fields (segmentation + unit_lengths + lexical counts),
+// - Overwrite ONLY backend-appropriate fields,
+// - Return final extraction JSON with the SAME schema.
+//
+// IMPORTANT:
+// - MUST NOT rename fields.
+// - MUST NOT add a root key named "raw_features".
+// - backend_reserved must remain { kpf_sim: null, tps_h: null }.
+// - Do NOT compute RSL level / FRI / gates / signal states. (Out of scope)
+//
+// Backend overwrites (recommended):
+// - layer_0.units
+// - layer_0.unit_lengths
+// - layer_0.per_unit.revisions
+// - layer_0.reasons
+// - layer_2.revisions
+// - layer_2.revision_depth_sum
+// - layer_3.hedges
+// - evidence_types
+// - adjacency_links
+// Keep GPT values for everything else unless explicitly overridden here.
+
+
+
+
+type NeuPrintExtractionSchema = {
+  layer_0: {
+    units: number;
+    unit_lengths: number[];
+    per_unit: {
+      transitions: number[];
+      revisions: number[];
+    };
+    claims: number;
+    reasons: number;
+    evidence: number;
+  };
+  layer_1: {
+    sub_claims: number;
+    warrants: number;
+    counterpoints: number;
+    refutations: number;
+    structure_type: null;
+  };
+  layer_2: {
+    transitions: number;
+    transition_types: string[];
+    transition_ok: number;
+    revisions: number;
+    revision_depth_sum: number;
+    belief_change: boolean;
+  };
+  layer_3: {
+    intent_markers: number;
+    drift_segments: number;
+    hedges: number;
+    loops: number;
+    self_regulation_signals: number;
+  };
+  evidence_types: EvidenceType[];
+  adjacency_links: number;
+  backend_reserved: { kpf_sim: null; tps_h: null };
+  rsl_rubric: { coherence: number; structure: number; evaluation: number; integration: number };
+  rsl: {
+    summary: { one_line: string; paragraph: string };
+    dimensions: Array<{ code: string; label: string; score_1to5: number; observation: string }>;
+  };
+  raw_signals_quotes: {
+    A7_value_aware_quote_candidates: string[];
+    A8_perspective_flexible_quote_candidates: string[];
+    self_repair_quote_candidates: string[];
+    framework_generation_quote_candidates: string[];
+  };
+};
+
+// ------------------------------
+// Public API
+// ------------------------------
+function fillExtractionJson(
+  gptJson: NeuPrintExtractionSchema,
+  inputText: string
+): { filled: NeuPrintExtractionSchema; unit_texts: string[] } {
+  const safeJson = deepClone(gptJson);
+
+  // 1) Deterministic segmentation
+  const seg = segmentText(inputText ?? "");
+  const unit_texts = seg.unit_texts;
+
+  // 2) Deterministic unit_lengths
+  const unit_lengths = computeUnitLengths(unit_texts);
+
+  // 3) Deterministic lexical counts
+  const counts = computeDeterministicCounts(unit_texts);
+
+  // 4) Overwrite backend-safe fields only (schema preserved)
+  // layer_0
+  safeJson.layer_0.units = unit_texts.length;
+  safeJson.layer_0.unit_lengths = unit_lengths;
+
+  // per_unit arrays: keep transitions as-is (GPT-side), but ensure length = units
+  safeJson.layer_0.per_unit.transitions = normalizeArrayLength(
+    safeJson.layer_0.per_unit.transitions,
+    unit_texts.length,
+    0
+  );
+  safeJson.layer_0.per_unit.revisions = normalizeArrayLength(
+    counts.per_unit_revisions,
+    unit_texts.length,
+    0
+  );
+
+  safeJson.layer_0.reasons = counts.reasons;
+
+  // layer_2
+  safeJson.layer_2.revisions = counts.revisions;
+  safeJson.layer_2.revision_depth_sum = counts.revision_depth_sum;
+
+  // layer_3
+  safeJson.layer_3.hedges = counts.hedges;
+
+  // root
+  safeJson.adjacency_links = counts.adjacency_links;
+  safeJson.evidence_types = counts.evidence_types;
+
+  // backend_reserved fixed
+  safeJson.backend_reserved = { kpf_sim: null, tps_h: null };
+
+  // Defensive: must not have forbidden root key
+  if ((safeJson as any).raw_features !== undefined) {
+    delete (safeJson as any).raw_features;
+  }
+
+  return { filled: safeJson, unit_texts };
+}
+
+// ------------------------------
+// Helpers
+// ------------------------------
+
+function deepClone<T>(obj: T): T {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+function normalizeArrayLength(arr: number[], n: number, fill: number): number[] {
+  const out = Array.isArray(arr) ? [...arr] : [];
+  if (out.length > n) return out.slice(0, n);
+  while (out.length < n) out.push(fill);
+  return out;
+}
+/* ===== END extraction_fill.fixed.ts (inlined) ===== */
+
+/* ===== BEGIN alias helpers (inlined) ===== */
+function fillExtractionJsonBackend(gptJson: any, inputText: string): { filled: any; unit_texts: string[] } {
+  // Backwards-compatible alias for derive.ts integration
+  return fillExtractionJson(gptJson as any, inputText);
+}
+/* ===== END alias helpers (inlined) ===== */
+
+
 export function deriveAll(input: GptBackendInput, opts: DeriveAllOptions = {}): any {
   const g = input ?? ({} as any);
 
@@ -4915,13 +5968,41 @@ export function deriveAll(input: GptBackendInput, opts: DeriveAllOptions = {}): 
   //        (A) { raw_features: {...}, rsl: {...} } wrapper
   //        (B) { layer_0: {...}, ... } raw_features-only payload
   // ---------------------------------------------------------
-  const raw: any = (g as any)?.raw_features ?? (g as any)?.raw ?? (g as any)?.rawFeatures ?? (g as any) ?? {};
+  let raw: any = (g as any)?.raw_features ?? (g as any)?.raw ?? (g as any)?.rawFeatures ?? (g as any) ?? {};
 
   const dims: RSLDimension[] =
     (Array.isArray(g?.rsl?.dimensions) ? g.rsl.dimensions : null) ??
     (Array.isArray(raw?.rsl?.dimensions) ? raw.rsl.dimensions : null) ??
     (Array.isArray(raw?.rsl_dimensions) ? raw.rsl_dimensions : null) ??
     [];
+
+  // ---------------------------------------------------------
+  // 0.5) Backend extraction filler (B-architecture)
+  //      - Compute segmentation + unit_lengths + deterministic lexical counts in backend
+  //      - Overwrite ONLY backend-appropriate fields in raw
+  // ---------------------------------------------------------
+  const inputText =
+    safeStr((g as any)?.input_text ?? (g as any)?.text ?? (g as any)?.submitted_text ?? (g as any)?.essay_text ?? "");
+
+  const shouldFill =
+    typeof inputText === "string" &&
+    inputText.length > 0 &&
+    raw &&
+    typeof raw === "object" &&
+    (raw as any).layer_0 &&
+    (raw as any).layer_1 &&
+    (raw as any).layer_2 &&
+    (raw as any).layer_3;
+
+  if (shouldFill) {
+    try {
+      const filledRes = fillExtractionJsonBackend(raw as any, inputText);
+      raw = filledRes.filled;
+    } catch {
+      // If filler fails, fall back to GPT-provided raw without throwing.
+    }
+  }
+
 
   // ---------------------------------------------------------
   // 1) RSL: FRI -> Level -> Cohort -> SRI
