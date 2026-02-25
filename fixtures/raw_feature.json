@@ -1,116 +1,113 @@
 {
-"layer_0": {
-"units": 6,
-"unit_lengths": [279, 156, 154, 279, 364, 445],
-"per_unit": {
-"transitions": [0, 0, 0, 0, 0, 0],
-"revisions": [0, 1, 0, 0, 1, 1]
-},
-"claims": 10,
-"reasons": 1,
-"evidence": 2
-},
-"layer_1": {
-"sub_claims": 3,
-"warrants": 1,
-"counterpoints": 0,
-"refutations": 0,
-"structure_type": null
-},
-"layer_2": {
-"transitions": 5,
-"transition_types": [],
-"transition_ok": 5,
-"revisions": 3,
-"revision_depth_sum": 0.6,
-"belief_change": false
-},
-"layer_3": {
-"intent_markers": 4,
-"drift_segments": 0,
-"hedges": 0,
-"loops": 0,
-"self_regulation_signals": 1
-},
-"evidence_types": ["example", "authority"],
-"adjacency_links": 1,
-"backend_reserved": { "kpf_sim": null, "tps_h": null },
-"rsl_rubric": {
-"coherence": 4,
-"structure": 3,
-"evaluation": 3,
-"integration": 3
-},
-"rsl": {
-"summary": {
-"one_line": "The reasoning argues for human-machine coexistence by contrasting what machines do best with what humans uniquely contribute, then connects this to an education shift.",
-"paragraph": "The text begins by describing concrete signs of automation and frames coexistence as the preferred stance. It then differentiates roles by assigning machines efficiency-driven tasks and reserving flexible, creative work for humans. A key pivot emphasizes depth of understanding over accumulation of memorized knowledge and extends this into an educational recommendation. Further development could strengthen the line by specifying clearer decision criteria for which tasks belong to each side and how the education shift would be implemented."
-},
-"dimensions": [
-{
-"code": "R1",
-"label": "Interpretation",
-"score_1to5": 4,
-"observation": "The text interprets AI-driven change as a shift in the human role rather than a simple contest of capability. It frames coexistence as the guiding purpose and links that purpose to how learning should be prioritized. A natural next extension would be to clarify the boundary conditions where coexistence becomes difficult and what trade rules apply then."
-},
-{
-"code": "R2",
-"label": "Issue Decomposition",
-"score_1to5": 3,
-"observation": "The reasoning separates the problem into automation impacts, role allocation between humans and machines, and the educational response that follows. These components are connected in sequence, but the internal relationships are not fully expanded into multiple interacting variables. It could be extended by distinguishing short-term adaptation steps from long-term institutional changes to make the decomposition more operational."
-},
-{
-"code": "R3",
-"label": "Evidence Quality",
-"score_1to5": 2,
-"observation": "Support relies on recognizable examples of automation and references to stated explanations, without examining reliability or representativeness. The examples function mainly as illustrations rather than as evaluated evidence that constrains the conclusion. A forward-looking improvement would be to add one comparative indicator or tested finding that directly shapes the recommended education shift."
-},
-{
-"code": "R4",
-"label": "Reasoning & Counterfactuals",
-"score_1to5": 3,
-"observation": "The argument uses conditional role allocation by assigning tasks based on comparative strengths of machines and humans. It also uses a limiting claim about memorization not surpassing AI-assisted machines to constrain the feasible strategy space. It could be extended by adding an explicit counterfactual case where humans rely on memorization and showing how outcomes diverge under that condition."
-},
-{
-"code": "R5",
-"label": "Coherence & Clarity",
-"score_1to5": 4,
-"observation": "The reasoning proceeds in a clear sequence from observed change to strategic stance to educational implication. Connective phrases maintain readability and keep the main line intact across transitions. It could be extended by tightening the bridge between human weaknesses and the specific educational practices proposed, so each link is easier to trace."
-},
-{
-"code": "R6",
-"label": "Metacognition & Self-repair",
-"score_1to5": 3,
-"observation": "The text signals reflective steering by prioritizing one knowledge dimension over another and by redirecting learning away from rote methods. This functions as a strategic reframing of what counts as preparation for the future, even without explicit self-correction language. It could be extended by stating one explicit limitation of the argument and showing how the recommendation would be adjusted in response."
-},
-{
-"code": "R7",
-"label": "Ethical / Societal Framing",
-"score_1to5": 2,
-"observation": "Human role and conscience are mentioned as guiding elements, suggesting a value-oriented lens in the educational recommendation. However, the text does not elaborate competing values or show how they constrain the conclusion. It could be extended by articulating what societal risks are avoided through the proposed shift and how conscience guides concrete choices."
-},
-{
-"code": "R8",
-"label": "Perspective Flexibility",
-"score_1to5": 2,
-"observation": "The reasoning contrasts human and machine strengths and briefly reframes the situation as coexistence rather than competition. Alternative perspectives are not compared in depth, and the argument mainly advances a single preferred stance. It could be extended by considering at least one alternative policy approach and explaining why the proposed approach performs better under a stated criterion."
-}
-]
-},
-"raw_signals_quotes": {
-"A7_value_aware_quote_candidates": [
-"As artificial intelligence advances, concerns are growing that machines will replace many human tasks, diminishing the role of humans.",
-"Wise reflection, guided by conscience, allows us to flexibly overcome the various limitations we will face in the future."
-],
-"A8_perspective_flexible_quote_candidates": [
-"Explanation (C) emphasizes that in the age of artificial intelligence, we must seek ways for humans and machines to coexist and thrive, rather than compete.",
-"In other words, machines should be entrusted with tasks they excel at, and humans should use the resulting energy to pursue tasks that only they excel at."
-],
-"self_repair_quote_candidates": [
-"Explanation (C) emphasizes that in the age of artificial intelligence, we must seek ways for humans and machines to coexist and thrive, rather than compete."
-],
-"framework_generation_quote_candidates": [
-"Therefore, as Explanation (A) emphasizes, in the age of artificial intelligence, "how well we know" is more important than "how much we know.""
-]
-}
+  "layer_0": {
+    "per_unit": {
+      "transitions": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "claims": 10,
+    "evidence": 2
+  },
+  "layer_1": {
+    "sub_claims": 3,
+    "warrants": 1,
+    "counterpoints": 0,
+    "refutations": 0,
+    "structure_type": null
+  },
+  "layer_2": {
+    "transitions": 5,
+    "transition_types": [],
+    "transition_ok": 5,
+    "belief_change": false
+  },
+  "layer_3": {
+    "intent_markers": 4,
+    "drift_segments": 0,
+    "loops": 0,
+    "self_regulation_signals": 1
+  },
+  "rsl_rubric": {
+    "coherence": 4,
+    "structure": 3,
+    "evaluation": 3,
+    "integration": 3
+  },
+  "rsl": {
+    "summary": {
+      "one_line": "The reasoning argues for human-machine coexistence by contrasting what machines do best with what humans uniquely contribute, then connects this to an education shift.",
+      "paragraph": "The text begins by describing concrete signs of automation and frames coexistence as the preferred stance. It then differentiates roles by assigning machines efficiency-driven tasks and reserving flexible, creative work for humans. A key pivot emphasizes depth of understanding over accumulation of memorized knowledge and extends this into an educational recommendation. Further development could strengthen the line by specifying clearer decision criteria for which tasks belong to each side and how the education shift would be implemented."
+    },
+    "dimensions": [
+      {
+        "code": "R1",
+        "label": "Interpretation",
+        "score_1to5": 4,
+        "observation": "The text interprets AI-driven change as a shift in the human role rather than a simple contest of capability. It frames coexistence as the guiding purpose and links that purpose to how learning should be prioritized. A natural next extension would be to clarify the boundary conditions where coexistence becomes difficult and what trade rules apply then."
+      },
+      {
+        "code": "R2",
+        "label": "Issue Decomposition",
+        "score_1to5": 3,
+        "observation": "The reasoning separates the problem into automation impacts, role allocation between humans and machines, and the educational response that follows. These components are connected in sequence, but the internal relationships are not fully expanded into multiple interacting variables. It could be extended by distinguishing short-term adaptation steps from long-term institutional changes to make the decomposition more operational."
+      },
+      {
+        "code": "R3",
+        "label": "Evidence Quality",
+        "score_1to5": 2,
+        "observation": "Support relies on recognizable examples of automation and references to stated explanations, without examining reliability or representativeness. The examples function mainly as illustrations rather than as evaluated evidence that constrains the conclusion. A forward-looking improvement would be to add one comparative indicator or tested finding that directly shapes the recommended education shift."
+      },
+      {
+        "code": "R4",
+        "label": "Reasoning & Counterfactuals",
+        "score_1to5": 3,
+        "observation": "The argument uses conditional role allocation by assigning tasks based on comparative strengths of machines and humans. It also uses a limiting claim about memorization not surpassing AI-assisted machines to constrain the feasible strategy space. It could be extended by adding an explicit counterfactual case where humans rely on memorization and showing how outcomes diverge under that condition."
+      },
+      {
+        "code": "R5",
+        "label": "Coherence & Clarity",
+        "score_1to5": 4,
+        "observation": "The reasoning proceeds in a clear sequence from observed change to strategic stance to educational implication. Connective phrases maintain readability and keep the main line intact across transitions. It could be extended by tightening the bridge between human weaknesses and the specific educational practices proposed, so each link is easier to trace."
+      },
+      {
+        "code": "R6",
+        "label": "Metacognition & Self-repair",
+        "score_1to5": 3,
+        "observation": "The text signals reflective steering by prioritizing one knowledge dimension over another and by redirecting learning away from rote methods. This functions as a strategic reframing of what counts as preparation for the future, even without explicit self-correction language. It could be extended by stating one explicit limitation of the argument and showing how the recommendation would be adjusted in response."
+      },
+      {
+        "code": "R7",
+        "label": "Ethical / Societal Framing",
+        "score_1to5": 2,
+        "observation": "Human role and conscience are mentioned as guiding elements, suggesting a value-oriented lens in the educational recommendation. However, the text does not elaborate competing values or show how they constrain the conclusion. It could be extended by articulating what societal risks are avoided through the proposed shift and how conscience guides concrete choices."
+      },
+      {
+        "code": "R8",
+        "label": "Perspective Flexibility",
+        "score_1to5": 2,
+        "observation": "The reasoning contrasts human and machine strengths and briefly reframes the situation as coexistence rather than competition. Alternative perspectives are not compared in depth, and the argument mainly advances a single preferred stance. It could be extended by considering at least one alternative policy approach and explaining why the proposed approach performs better under a stated criterion."
+      }
+    ]
+  },
+  "raw_signals_quotes": {
+    "A7_value_aware_quote_candidates": [
+      "As artificial intelligence advances, concerns are growing that machines will replace many human tasks, diminishing the role of humans.",
+      "Wise reflection, guided by conscience, allows us to flexibly overcome the various limitations we will face in the future."
+    ],
+    "A8_perspective_flexible_quote_candidates": [
+      "Explanation (C) emphasizes that in the age of artificial intelligence, we must seek ways for humans and machines to coexist and thrive, rather than compete.",
+      "In other words, machines should be entrusted with tasks they excel at, and humans should use the resulting energy to pursue tasks that only they excel at."
+    ],
+    "self_repair_quote_candidates": [
+      "Explanation (C) emphasizes that in the age of artificial intelligence, we must seek ways for humans and machines to coexist and thrive, rather than compete."
+    ],
+    "framework_generation_quote_candidates": [
+      "Therefore, as Explanation (A) emphasizes, in the age of artificial intelligence, \"how well we know\" is more important than \"how much we know\"."
+    ]
+  }
 }
